@@ -14,6 +14,7 @@ public class PotManager {
     private Map<Player, Double> River = new HashMap<>();
     private List<SidePot> sidePots = new ArrayList<>();
     private double mainPot = 0.0;
+    double finalPot;
     public PotManager(){
 
     }
@@ -36,6 +37,7 @@ public class PotManager {
 
     public void reset() {
         this.mainPot = 0;
+        this.finalPot = 0;
         this.sidePots.clear();
         this.PreFlop.clear();
         this.Flop.clear();
@@ -54,6 +56,7 @@ public class PotManager {
 
 
     private void processStreetBets(Map<Player, Double> streetBets, String streetName) {
+
         if (streetBets.isEmpty()) {
             //System.out.println(streetName + " bets are empty, skipping...");
             return;
@@ -64,6 +67,7 @@ public class PotManager {
         sortedBets.sort(Comparator.comparingDouble(Map.Entry::getValue)); // Сортируем по размеру ставок
 
         double totalStreetAmount = streetBets.values().stream().mapToDouble(Double::doubleValue).sum();
+
         while (!sortedBets.isEmpty()) {
             double minBet = sortedBets.get(0).getValue(); // Берем минимальную ставку
             List<Player> eligiblePlayers = new ArrayList<>();
@@ -94,7 +98,8 @@ public class PotManager {
 
         // Добавляем все ставки с улицы в главный банк
         mainPot += streetBets.values().stream().mapToDouble(Double::doubleValue).sum();
-        PotUpdate potUpdate = new PotUpdate(totalStreetAmount);
+        finalPot += totalStreetAmount;
+        PotUpdate potUpdate = new PotUpdate(finalPot);
         server.sendToAllTCP(potUpdate);
     }
     public double getTotalPot() {

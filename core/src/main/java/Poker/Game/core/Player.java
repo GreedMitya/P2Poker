@@ -1,4 +1,5 @@
 package Poker.Game.core;
+import Poker.Game.PacketsClasses.FoldNotification;
 import Poker.Game.PacketsClasses.PlayerBalanceUpdate;
 import Poker.Game.PacketsClasses.PlayerBetUpdate;
 import Poker.Game.Server.PokerServer;
@@ -42,6 +43,8 @@ public class Player {
 
     public void fold(){
         this.folded = true;
+        FoldNotification foldNotification = new FoldNotification(getConnectionId());
+        server.sendToAllTCP(foldNotification);
     }
 
     public boolean isFolded(){

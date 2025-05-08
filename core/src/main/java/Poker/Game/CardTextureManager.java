@@ -13,6 +13,7 @@ import java.util.Map;
 
 public class CardTextureManager {
     private static final Map<String, TextureRegion> cardTextures = new HashMap<>();
+    private static TextureRegion backTexture;
 
     public static void load() {
         for (Card.Suit suit : Card.Suit.values()) {
@@ -23,6 +24,12 @@ public class CardTextureManager {
                 cardTextures.put(key, new TextureRegion(texture));
             }
         }
+        // Загружаем рубашку
+        Texture back = new Texture(Gdx.files.internal("sgx/exported_cards/back.png")); // <-- путь к рубашке
+        backTexture = new TextureRegion(back);
+    }
+    public static TextureRegion getBackTexture() {
+        return backTexture;
     }
 
     public static TextureRegion getTexture(Card card) {
@@ -61,4 +68,6 @@ public class CardTextureManager {
         }
         return "X";
     }
+
+
 }

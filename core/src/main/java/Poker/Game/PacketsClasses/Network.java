@@ -12,6 +12,7 @@ import java.util.List;
 public class Network {
     public static void register(Kryo kryo) {
         kryo.register(ArrayList.class);
+        kryo.register(FoldNotification.class);
         kryo.register(PotUpdate.class);
         kryo.register(PlayerBetUpdate.class);
         kryo.register(ClearBetsNotification.class);

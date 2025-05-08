@@ -10,13 +10,11 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.*;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -27,295 +25,229 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private final PokerApp app;
     private final PokerClient client;
     private final boolean isHost;
-    private TextButton startBtn;
-    private List<String> currentPlayers = new ArrayList<>();
-    private final float radius = 250f;// Радиус круга для расстановки
-    private final float tableCenterX = Gdx.graphics.getWidth() / 2f;
-    private final float tableCenterY = Gdx.graphics.getHeight() / 2f;
-    private final List<Image> playerAvatars = new ArrayList<>();
-    private final List<CardActor> playerCardActors = new ArrayList<>();
-    private final Map<String, Integer> nicknameToIndex = new HashMap<>();
-    private Map<Integer, Image> playerIdToAvatar = new HashMap<>();
-    private Label potLabel;
-
-
-    private Texture avatarTexture;
 
     private Stage stage;
     private Skin skin;
+    private Texture avatarTexture;
 
-    // UI-элементы
-    private TextButton foldBtn, callBtn, raiseBtn,checkBtn;
+    // Все игроки по Id
+    private final Map<Integer, PlayerActor> playerActorsById = new HashMap<>();
+    private List<String> currentPlayers = new ArrayList<>();
+    private final Map<String, Double> playerBalances = new HashMap<>();
+
+    //Карты игрока
+    private final List<CardActor> playerCardActors = new ArrayList<>();
+
+
+    // Для центральных карт
+    private final List<CardActor> tableCardActors = new ArrayList<>();
+    private final float radius       = 250f;
+    private final float tableCenterX = Gdx.graphics.getWidth()/2f;
+    private final float tableCenterY = Gdx.graphics.getHeight()/2f;
+
+    // UI: кнопки и чат
+    private TextButton startBtn, foldBtn, callBtn, raiseBtn, checkBtn;
     private Slider raiseSlider;
-    private Label raiseAmountLabel;
-    private Table chatTable;
-    private ScrollPane chatScroll;
+    private Label raiseAmountLabel, potLabel;
     private Table chatMessages;
-
+    private ScrollPane chatScroll;
     private TextField chatInputField;
     private TextButton sendButton;
 
-
-
-
-    // Для текущего запроса хода
+    // Текущий запрос хода
     private int currentPlayerId;
     private Action[] currentActions;
-
-    //Для баланса игроков
-    private Map<String, Double> playerBalances = new HashMap<String, Double>();
-    private Map<String, Label> balanceLabelsById = new HashMap<>();
-    private final List<CardActor> tableCardActors = new ArrayList<>();
-    Map<Integer, Label> playerBetLabels = new HashMap<>();
-
-
-
 
     public GameScreen(PokerApp app, PokerClient client, boolean isHost) {
         this.app    = app;
         this.client = client;
         this.isHost = isHost;
-        // Регистрируем себя как слушатель сетевых событий
         this.client.setListener(this);
     }
 
     @Override
     public void show() {
+        // Загрузка карт
         CardTextureManager.load();
 
+        // Сцена и фон
         avatarTexture = new Texture(Gdx.files.internal("sgx/raw/defaulrAvatar.png"));
         stage = new Stage(new ScreenViewport());
-        Texture bgTexture = new Texture(Gdx.files.internal("sgx/raw/171.jpg"));
-        Image background = new Image(bgTexture);
-        background.setFillParent(true); // Растягивает на весь экран
-        stage.addActor(background);
-        // Добавляем первым, чтобы был позади
+        Image bg = new Image(new Texture(Gdx.files.internal("sgx/raw/171.jpg")));
+        bg.setFillParent(true);
+        stage.addActor(bg);
 
-        // POKER TABLE
-        Texture tableTexture = new Texture(Gdx.files.internal("sgx/raw/Atp.png"), true); // true = генерировать mipmaps
-        tableTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);      // сглаживание
+        // Стол
+        Texture tableTex = new Texture(Gdx.files.internal("sgx/raw/Atp.png"), true);
+        tableTex.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        Image table = new Image(new TextureRegionDrawable(new com.badlogic.gdx.graphics.g2d.TextureRegion(tableTex)));
+        table.setSize(1000, 800);
+        table.setPosition((Gdx.graphics.getWidth()-1000+20)/2f,
+            (Gdx.graphics.getHeight()-800)/2f);
+        table.setTouchable(Touchable.disabled);
+        stage.addActor(table);
 
-        Image tableImage = new Image(new TextureRegionDrawable(new TextureRegion(tableTexture)));
-        tableImage.setTouchable(Touchable.disabled); // Не перехватывает клики
-        tableImage.setSize(1000,800);
-        // Центрируем на экране
-        tableImage.setPosition(
-            (Gdx.graphics.getWidth()  - tableImage.getWidth()+20)/2f,
-            (Gdx.graphics.getHeight() - tableImage.getHeight())/2f
-        );
-
-        // Добавляем поверх фона
-        stage.addActor(tableImage);
-
-
-
-
-
-
-
-        this.skin = new Skin(Gdx.files.internal("sgx/skin/sgx-ui.json"),
+        // Skin и ввод
+        skin = new Skin(Gdx.files.internal("sgx/skin/sgx-ui.json"),
             new TextureAtlas(Gdx.files.internal("sgx/skin/sgx-ui.atlas")));
         Gdx.input.setInputProcessor(stage);
 
-
-
-
-
-
-
-
-
-
-        // === Создаём UI ===
-        foldBtn    = new TextButton("Fold",  skin);
-        callBtn    = new TextButton("Call",  skin);
-        raiseBtn   = new TextButton("Raise", skin);
-        checkBtn = new TextButton("Check", skin);
-        startBtn = new TextButton("Start Game", skin);
-        raiseSlider = new Slider(20, 1000, 10, false, skin); // от 10 до 1000 с шагом 10
-        raiseAmountLabel = new Label("20$", skin); // отображение текущей суммы рейза
-
-
-
-        //Bank (center) main pot!
+        // Пот
         potLabel = new Label("Pot: 0", skin);
         potLabel.setFontScale(1.2f);
-        potLabel.setPosition(stage.getWidth() / 2f - potLabel.getWidth() / 2f, stage.getHeight() / 2f + 100); // по центру
+        potLabel.setPosition(stage.getWidth()/2f - potLabel.getWidth()/2f,
+            stage.getHeight()/2f + 100);
         stage.addActor(potLabel);
 
+        setupActionButtons();
+        setupChat();
+    }
 
+    private void setupActionButtons() {
+        startBtn = new TextButton("Start Game", skin);
+        foldBtn  = new TextButton("Fold", skin);
+        callBtn  = new TextButton("Call", skin);
+        raiseBtn = new TextButton("Raise", skin);
+        checkBtn = new TextButton("Check", skin);
+        raiseSlider      = new Slider(20, 1000, 10, false, skin);
+        raiseAmountLabel = new Label("20$", skin);
 
-
-        //Chat and info label in 1 tool:
-        chatMessages = new Table();
-        chatMessages.top().left(); // Выравнивание
-        chatMessages.defaults().pad(5).left().width(280); // ширина + паддинг
-
-        chatScroll = new ScrollPane(chatMessages, skin);
-        chatScroll.setScrollingDisabled(true, false);
-        chatScroll.setFadeScrollBars(false);
-        chatScroll.setScrollbarsOnTop(false);
-        chatScroll.setForceScroll(false, true);
-        chatScroll.setSize(300, 200);
-        chatScroll.setPosition(10, 40);
-        stage.addActor(chatScroll);
-
-        chatInputField = new TextField("", skin);
-        chatInputField.setMessageText("Type a message...");
-        chatInputField.setPosition(10, 1);
-        chatInputField.setSize(300, 40);
-
-        sendButton = new TextButton("Send", skin);
-        sendButton.setSize(70, 30);
-        sendButton.setPosition(310,40);
-
-        stage.addActor(chatInputField);
-        stage.addActor(sendButton);
-
-
-
-
-
-
-
-        // Задаём позиции
-        checkBtn.setPosition(870, 10);
-        checkBtn.setSize(110, 80);
-        foldBtn.setPosition(750, 10);
-        foldBtn.setSize(110,80);
-        callBtn.setPosition(870, 10);
-        callBtn.setSize(110,80);
-        raiseSlider.setPosition(990, 100);
-        raiseAmountLabel.setPosition(990, 140);
-        raiseSlider.setSize(110, 30);
-        raiseBtn.setPosition(990, 10);
-        raiseBtn.setSize(110,80);
         startBtn.setPosition(500, 20);
-
-
-
-
-
-
-        // Изначально прячем кнопки действий
-        hideActionUI();
-
-        // Добавляем на сцену
-        stage.addActor(startBtn);
-        stage.addActor(foldBtn);
-        stage.addActor(callBtn);
-        stage.addActor(raiseBtn);
-        stage.addActor(checkBtn);
-        stage.addActor(raiseSlider);
-        stage.addActor(raiseAmountLabel);
-
-
-        // === Логика кнопок ===
-
-
-
+        startBtn.setSize(300, 60);
+        foldBtn.setPosition(900, 10);
+        foldBtn.setSize(110, 60);
+        callBtn.setPosition(1020, 10);
+        callBtn.setSize(110, 60);
+        checkBtn.setPosition(1020, 10);
+        checkBtn.setSize(110, 60);
+        raiseBtn.setPosition(1140, 10);
+        raiseBtn.setSize(110, 60);
+        raiseSlider.setPosition(1040, 80);
+        raiseSlider.setSize(200,60);
+        raiseAmountLabel.setPosition(1040,140);
 
         startBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                client.sendGameStart();       // отправляем GameStartRequest
-                startBtn.setVisible(false);   // прячем кнопку
+            @Override public void changed(ChangeEvent event, Actor actor) {
+                client.sendGameStart();
+                startBtn.setVisible(false);
             }
         });
-        checkBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                client.sendCheck(currentPlayerId); // реализация позже
-                hideActionUI();
-            }
-        });
-        sendButton.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                String text = chatInputField.getText().trim();
-                if (!text.isEmpty()) {
-                    client.sendChatMessage(text);  // Предполагаем, что ты добавишь соответствующий метод
-                    chatInputField.setText("");
-                }
-            }
-        });
-
-
         foldBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
+            @Override public void changed(ChangeEvent event, Actor actor) {
                 client.sendFold(currentPlayerId);
                 hideActionUI();
             }
         });
-        raiseSlider.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                int value = (int) raiseSlider.getValue();
-                raiseAmountLabel.setText(value + "$");
-            }
-        });
-
         callBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
+            @Override public void changed(ChangeEvent event, Actor actor) {
                 client.sendCall(currentPlayerId);
+
                 hideActionUI();
+            }
+        });
+        checkBtn.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, Actor actor) {
+                client.sendCheck(currentPlayerId);
+                hideActionUI();
+            }
+        });
+        raiseBtn.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, Actor actor) {
+                client.sendRaise(currentPlayerId, (int)raiseSlider.getValue());
+                raiseSlider.setValue(20);
+                hideActionUI();
+            }
+        });
+        raiseSlider.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, Actor actor) {
+                raiseAmountLabel.setText((int)raiseSlider.getValue() + "$");
             }
         });
 
-        raiseBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                int amt = (int) raiseSlider.getValue();
-                client.sendRaise(currentPlayerId, amt);
-                hideActionUI();
-                raiseSlider.setValue(20);
-            }
-        });
-        chatInputField.addListener(new InputListener() {
-            @Override
-            public boolean keyTyped(InputEvent event, char character) {
-                if (character == '\n') {
-                    sendButton.toggle(); // и/или просто вызвать `sendButton.fire(new ChangeEvent())`
-                    return true;
-                }
-                return false;
-            }
-        });
+        hideActionUI();
+        stage.addActor(startBtn);
+        stage.addActor(foldBtn);
+        stage.addActor(callBtn);
+        stage.addActor(checkBtn);
+        stage.addActor(raiseBtn);
+        stage.addActor(raiseSlider);
+        stage.addActor(raiseAmountLabel);
     }
 
+    private void hideActionUI() {
+        startBtn.setVisible(false);
+        foldBtn.setVisible(false);
+        callBtn.setVisible(false);
+        checkBtn.setVisible(false);
+        raiseBtn.setVisible(false);
+        raiseSlider.setVisible(false);
+        raiseAmountLabel.setVisible(false);
+    }
+    private void setupChat() {
+        chatMessages = new Table();
+        chatMessages.top().left();
+        chatMessages.defaults().pad(5).left().width(280);
+
+        chatScroll = new ScrollPane(chatMessages, skin);
+        chatScroll.setSize(300, 200);
+        chatScroll.setPosition(10, 40);
+        chatScroll.setScrollingDisabled(true, false);
+        stage.addActor(chatScroll);
+
+        chatInputField = new TextField("", skin);
+        chatInputField.setMessageText("Type a message...");
+        chatInputField.setSize(300, 40);
+        chatInputField.setPosition(10, 1);
+        stage.addActor(chatInputField);
+
+        sendButton = new TextButton("Send", skin);
+        sendButton.setSize(70, 30);
+        sendButton.setPosition(310,40);
+        sendButton.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, Actor actor) {
+                String msg = chatInputField.getText().trim();
+                if (!msg.isEmpty()) {
+                    client.sendChatMessage(msg);
+                    chatInputField.setText("");
+                }
+            }
+        });
+        stage.addActor(sendButton);
+    }
+    @Override
+    public void resize(int width, int height) {
+        // вот этот параметр `true` — он гарантирует,
+        // что камера не будет «резать» сцену,
+        // а отцентрирует её и подгонит под новое соотношение сторон
+        stage.getViewport().update(width, height, true);
+    }
+
+    @Override public void pause()  { /* не нужно */ }
+
+    @Override public void resume() { /* не нужно */ }
+    @Override public void hide()   { /* не нужно */ }
     @Override
     public void render(float delta) {
-        ScreenUtils.clear(0, 0, 0, 1);
+        ScreenUtils.clear(0,0,0,1);
         stage.act(delta);
         stage.draw();
     }
 
-    @Override public void resize(int width, int height) { stage.getViewport().update(width, height); }
-    @Override public void pause()  { /* не нужно */ }
-    @Override public void resume() { /* не нужно */ }
-    @Override public void hide()   { /* не нужно */ }
-
-    @Override
-    public void dispose() {
+    @Override public void dispose() {
         stage.dispose();
         skin.dispose();
-        if (avatarTexture != null) avatarTexture.dispose();
-    }
-
-    // Спрятать кнопки и показать общую надпись
-    private void hideActionUI() {
-        checkBtn.setVisible(false);
-        foldBtn.setVisible(false);
-        callBtn.setVisible(false);
-        raiseSlider.setVisible(false);
-        raiseAmountLabel.setVisible(false);
-        raiseBtn.setVisible(false);
-        startBtn.setVisible(false); // пока прячем
+        avatarTexture.dispose();
     }
 
     // === Реализация ClientListener ===
+
+    @Override
+    public void onPlayerListUpdate(List<String> nicknames) {
+        this.currentPlayers = nicknames;
+        Gdx.app.postRunnable(() -> {
+            if (isHost && nicknames.size() >= 2) startBtn.setVisible(true);
+        });
+    }
 
     @Override
     public void onJoinResponse(JoinResponse resp) {
@@ -324,42 +256,9 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         });
     }
 
-
-    @Override
-    public void onPlayerListUpdate(List<String> nicknames) {
-        this.currentPlayers = nicknames;  // сохраняем
-
-        Gdx.app.postRunnable(() -> {
-            addChatMessage("Players: " + String.join(", ", nicknames));
-            if (isHost && nicknames.size() >= 2) {
-                startBtn.setVisible(true);
-                addChatMessage("Ready to start! Players: " + nicknames.size());
-            } else {
-                startBtn.setVisible(false);
-            }
-        });
-    }
-
-
     @Override
     public void onGameStarted(GameStartedNotification note) {
-        Gdx.app.postRunnable(() -> {
-            addChatMessage("Game started!");
-            for (Label label : balanceLabelsById.values()) {
-                label.remove();
-            }
-            balanceLabelsById.clear();
-            arrangePlayersOnTable(currentPlayers);
-        });
-    }
-
-
-    @Override
-    public void onCardInfo(CardInfo info) {
-        Gdx.app.postRunnable(() -> {
-            addChatMessage("Your cards: " + info.getHand());
-            showPlayerCards(info.getHand());
-        });
+        Gdx.app.postRunnable(() -> arrangePlayersOnTable(currentPlayers));
     }
 
 
@@ -370,11 +269,73 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         );
     }
 
+    private void arrangePlayersOnTable(List<String> players) {
+        // очищаем
+        for (PlayerActor pa : playerActorsById.values()) pa.remove();
+        playerActorsById.clear();
+
+        float screenW = Gdx.graphics.getWidth();
+        float screenH = Gdx.graphics.getHeight();
+
+        int total   = players.size();
+        int myIndex = players.indexOf(client.getNickName());
+
+        for (int i = 0; i < total; i++) {
+            String nick = players.get((myIndex + i) % total);
+            int id      = client.getIdByNickname(nick);
+
+            PlayerActor pa = new PlayerActor(
+                id, nick,
+                playerBalances.getOrDefault(nick, 0.0),
+                avatarTexture, skin
+            );
+            // В конструкторе он уже вызвал pack() и setSize(...)
+
+            // Считаем позицию по кругу
+            float angle = (float)(-Math.PI/2 + 2*Math.PI*i/total);
+            float x = tableCenterX + radius * (float)Math.cos(angle) - pa.getWidth()/2f;
+            float y = tableCenterY + radius * (float)Math.sin(angle) - pa.getHeight()/2f;
+
+            pa.setPosition(x, y);
+            stage.addActor(pa);
+            playerActorsById.put(id, pa);
+
+            if (id != client.getMyId()) {
+                pa.showCardBacks();
+            }
+        }
+    }
+
+    @Override
+    public void onPlayerBalanceUpdate(PlayerBalanceUpdate upd) {
+        playerBalances.put(upd.name, upd.newBalance);
+        Gdx.app.postRunnable(() -> {
+            PlayerActor pa = playerActorsById.get(client.getIdByNickname(upd.name));
+            if (pa != null) pa.updateBalance(upd.newBalance);
+        });
+    }
+    @Override
+    public void onPlayerBetUpdate(PlayerBetUpdate upd) {
+        Gdx.app.postRunnable(() -> {
+            PlayerActor pa = playerActorsById.get(upd.playerId);
+            if (pa != null) pa.showBet(upd.amount);
+        });
+    }
+    @Override
+    public void onClearBets() {
+        Gdx.app.postRunnable(() -> {
+            for (PlayerActor pa : playerActorsById.values()) pa.clearBet();
+        });
+    }
+
     @Override
     public void onBlinds(BlindsNotification note) {
-        Gdx.app.postRunnable(() ->
-            addChatMessage(note.getSmallBlind())
-        );
+        Gdx.app.postRunnable(() -> {
+            addChatMessage(note.getSmallBlind());
+            for (PlayerActor playerActor : playerActorsById.values()) {
+                playerActor.showCardBacks(); // Показываем рубашки карт
+            }
+        });
     }
 
     @Override
@@ -411,40 +372,14 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     }
 
     @Override
-    public void onPlayerBalanceUpdate(PlayerBalanceUpdate update) {
-        String playerName = update.name;
-        double balance = update.newBalance;
-        playerBalances.put(playerName, balance);
-
-        Label label = balanceLabelsById.get(playerName); // ✅ исправлено
-        if (label != null) {
-            Gdx.app.postRunnable(() -> label.setText(balance + "$"));
-        }
-    }
-
-    @Override
     public void onTableCardsInfo(TableCardsInfo tableCardsInfo) {
         Gdx.app.postRunnable(() -> showTableCards(tableCardsInfo.getCards()));
-    }
-
-
-    @Override
-    public void onClearBets() {
-        Gdx.app.postRunnable(() -> {
-            clearPlayerBets();
-        });
     }
     @Override
     public void onPotUpdate(PotUpdate update) {
         updatePot(update.getPotAmount());
     }
 
-    @Override
-    public void onPlayerBetUpdate(PlayerBetUpdate update) {
-        Gdx.app.postRunnable(() -> {
-            showPlayerBet(update.playerId, update.amount);
-        });
-    }
 
     public void onChatMessage(ChatMessage object) {
         Gdx.app.postRunnable(() -> {
@@ -459,6 +394,42 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         });
     }
 
+    @Override
+    public void onPlayerFold(FoldNotification notif) {
+        Gdx.app.postRunnable(() -> {
+            PlayerActor pa = playerActorsById.get(notif.playerId);
+            if (pa != null) pa.clearCardBacks();
+        });
+    }
+
+    @Override
+    public void onCardInfo(CardInfo info) {
+        Gdx.app.postRunnable(() -> {
+            addChatMessage("Your cards: " + info.getHand());
+            showPlayerCards(info.getHand());
+        });
+    }
+
+    // Показывает собственные две карты игрока
+    private void showPlayerCards(List<Card> hand) {
+        for (CardActor actor : playerCardActors) {
+            actor.remove();
+        }
+        playerCardActors.clear();
+
+        // Позиционируем
+        float spacing = 40;
+        float startX  = tableCenterX - spacing +16;// / 2f; // чтобы карты чуть влево/вправо разошлись
+        float y       = 135;                         // нижняя часть экрана
+
+        for (int i = 0; i < hand.size(); i++) {
+            CardActor cardActor = new CardActor(hand.get(i));
+            cardActor.setSize(90, 134);
+            cardActor.setPosition(startX + i * spacing, y);
+            stage.addActor(cardActor);
+            playerCardActors.add(cardActor);
+        }
+    }
 
 
     private void showTableCards(ArrayList<Card> tableCards) {
@@ -486,28 +457,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         }
     }
 
-    private void showPlayerCards(List<Card> hand) {
-        for (CardActor actor : playerCardActors) {
-            actor.remove();
-        }
-        playerCardActors.clear();
-
-        float spacing = 40;
-        float startX = tableCenterX - 60;
-        float y = 135;
-
-        for (int i = 0; i < hand.size(); i++) {
-            Card card = hand.get(i);
-            CardActor cardActor = new CardActor(card);
-            cardActor.setSize(90, 134);
-            cardActor.setPosition(startX + i * spacing, y);
-            stage.addActor(cardActor);
-            playerCardActors.add(cardActor);
-        }
-    }
-
-
-
     private void addChatMessage(String message) {
         Label.LabelStyle style = new Label.LabelStyle(skin.getFont("font"), Color.WHITE);
         Label label = new Label(message, style);
@@ -517,114 +466,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         chatMessages.add(label).left().width(280).padBottom(5).row();
     }
 
-
-    public void clearPlayerBets() {
-        for (Label label : playerBetLabels.values()) {
-            label.remove();
-        }
-        playerBetLabels.clear();
-    }
-
-
-    private void showPlayerBet(int playerId, double amount) {
-        // Не показываем ставку, если она равна 0
-        if (amount <= 0) {
-            Label oldLabel = playerBetLabels.get(playerId);
-            if (oldLabel != null) {
-                oldLabel.remove();
-                playerBetLabels.remove(playerId);
-            }
-            return;
-        }
-
-        String nickname = client.getNicknameById(playerId);
-        if (nickname == null) return;
-
-        Integer index = nicknameToIndex.get(nickname);
-        if (index == null || index >= playerAvatars.size()) return;
-
-        // Удаляем старый лейбл
-        Label oldLabel = playerBetLabels.get(playerId);
-        if (oldLabel != null) oldLabel.remove();
-
-        Image avatar = playerAvatars.get(index);
-        float x = avatar.getX();
-        float y = avatar.getY();
-
-        Label.LabelStyle betStyle = new Label.LabelStyle(skin.getFont("font"), Color.WHITE);
-        betStyle.background = skin.newDrawable("white", Color.DARK_GRAY); // фон
-        Label betLabel = new Label((int) amount + "$", betStyle);
-        betLabel.setFontScale(1.2f);
-        betLabel.setColor(Color.GOLD); // цвет текста
-        betLabel.setAlignment(Align.center);
-        betLabel.setSize(60, 40); // делаем его как фишку
-        betLabel.setPosition(x - 50, y + 25);
-
-        stage.addActor(betLabel);
-        playerBetLabels.put(playerId, betLabel);
-    }
-
-
-    private void arrangePlayersOnTable(List<String> players) {
-        for (Actor actor : playerAvatars) {
-            actor.remove();
-        }
-        playerAvatars.clear();
-
-        int totalPlayers = players.size();
-        int myIndex = players.indexOf(client.getNickName());
-        if (myIndex == -1) return;
-
-        List<String> ordered = new ArrayList<>();
-        for (int i = 0; i < totalPlayers; i++) {
-            ordered.add(players.get((myIndex + i) % totalPlayers));
-        }
-
-
-        for (int i = 0; i < totalPlayers; i++) {
-            String nickname = ordered.get(i);
-
-            Image avatar = new Image(avatarTexture); // Используем заранее загруженный texture
-            avatar.setSize(64, 64);
-            avatar.setScaling(Scaling.fit); // помогает сохранить пропорции, если аватарка встроена в Image
-            nicknameToIndex.put(nickname, i); // <-- ЭТОГО НЕ ХВАТАЕТ!
-
-            float x, y;
-            if (i == 0) {
-                x = tableCenterX - 32;
-                y = 70;
-            } else {
-                float angle;
-                if (totalPlayers == 2) {
-                    angle = (float) (Math.PI / 2); // напротив
-                } else if (totalPlayers == 3) {
-                    angle = (float) (Math.PI / 2 + (i - 1.5f) * Math.PI / 2);
-                } else {
-                    angle = (float) (-Math.PI / 2 + 2 * Math.PI * i / totalPlayers);
-                }
-
-                x = tableCenterX + (float) Math.cos(angle) * radius - 32;
-                y = tableCenterY + (float) Math.sin(angle) * radius + 45;
-            }
-            avatar.setPosition(x, y);
-            stage.addActor(avatar);
-            playerAvatars.add(avatar);
-
-            Label nameLabel = new Label(nickname, skin);
-            nameLabel.setPosition(x, y - 20);
-            stage.addActor(nameLabel);
-            Label balanceLabel = new Label("$", skin);
-            balanceLabel.setPosition(x, y - 40);
-            Double balance = playerBalances.get(nickname);
-            if (balance != null) {
-                balanceLabel.setText(balance + "$");
-            } else {
-                balanceLabel.setText("?"); // на случай если не пришло
-            }
-            stage.addActor(balanceLabel);
-            balanceLabelsById.put(nickname, balanceLabel); // ← используем имя каждого игрока!
-        }
-    }
     public void updatePot(double potValue) {
         Gdx.app.postRunnable(() -> {
             if (potLabel != null) {

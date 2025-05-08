@@ -16,16 +16,22 @@ import java.util.Map;
  * Клиент для покер-рума, «чистый» от консоли, отдаёт все события в ClientListener.
  */
 public class PokerClient {
+    private int clientId;
     private Client client;
     private ClientListener listener;
     private boolean host;
     private String name;
-    private Map<Integer, String> idToNickname = new HashMap<>();
-    private Map<String, Integer> nicknameToId = new HashMap<>();
+    private final Map<Integer, String> idToNickname   = new HashMap<>();
+    private final Map<String, Integer> nicknameToId   = new HashMap<>();
 
 
     public void registerPlayer(int id, String nickname) {
         idToNickname.put(id, nickname);
+        nicknameToId.put(nickname, id);
+        // если это мы — сохраняем clientId
+        if (nickname.equals(this.name)) {
+            this.clientId = id;
+        }
     }
 
     public String getNicknameById(int id) {
@@ -81,7 +87,6 @@ public class PokerClient {
                         int playerId = entry.getValue();
                         registerPlayer(playerId, nickname);
                     }
-
                     listener.onPlayerListUpdate(update.getNicknamesOnly());
                 }
                 else if (object instanceof GameStartedNotification) {
@@ -105,6 +110,8 @@ public class PokerClient {
                     listener.onChatMessage(message);
                 } else if (object instanceof  PotUpdate) {
                     listener.onPotUpdate((PotUpdate) object);
+                }else if (object instanceof FoldNotification) {
+                    listener.onPlayerFold((FoldNotification) object);
                 }
             }
 
@@ -181,4 +188,7 @@ public class PokerClient {
         client.sendTCP(new ChatMessage(text, name));
     }
 
+    public int getMyId() {
+        return clientId;
+    }
 }

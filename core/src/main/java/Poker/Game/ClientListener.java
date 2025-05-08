@@ -19,7 +19,6 @@ public interface ClientListener {
     void onPlayerBetUpdate(PlayerBetUpdate update);
     void onClearBets();
     void onPotUpdate(PotUpdate potUpdate);
+    void onPlayerFold(FoldNotification notif);
 
-
-    // и любые другие тебе нужные события
 }
