@@ -91,7 +91,7 @@ public class HandEvaluator {
         for (List<Card> suitedCards : suitGroups.values()) {
             if (suitedCards.size() >= 5) {
                 Collections.sort(suitedCards, Collections.reverseOrder());
-                return suitedCards.subList(0, 5);
+                return new ArrayList<>(suitedCards.subList(0, 5));
             }
         }
         return Collections.emptyList();
@@ -277,7 +277,7 @@ public class HandEvaluator {
                         return c2.getRank().ordinal() - c1.getRank().ordinal();
                     }
                 });
-                return suitedCards.subList(0, 5);
+                return new ArrayList<>(suitedCards.subList(0, 5));
             }
         }
         return Collections.emptyList();
@@ -557,7 +557,7 @@ public class HandEvaluator {
             sortedRanks.add(card.getRank().ordinal());
         }
         Collections.sort(sortedRanks, Collections.reverseOrder());
-        List<Integer> highCards = sortedRanks.subList(0, Math.min(5, sortedRanks.size()));
+        List<Integer> highCards = new ArrayList<>(sortedRanks.subList(0, Math.min(5, sortedRanks.size())));
         return highCards.get(0) * 10000 + highCards.get(1) * 10000 + highCards.get(2) * 1000 + highCards.get(3) * 10 + highCards.get(4);
     }
 
@@ -569,6 +569,8 @@ public class HandEvaluator {
                 return c2.getRank().ordinal() - c1.getRank().ordinal();
             }
         });
-        return sortedCards.subList(0, Math.min(5, sortedCards.size()));
+        List<Card> highCards = new ArrayList<>(sortedCards.subList(0, Math.min(5, sortedCards.size())));
+
+        return highCards;
     }
 }

@@ -1,7 +1,9 @@
 package Poker.Game;
 
+import Poker.Game.core.Card;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.utils.Align;
 
@@ -15,6 +17,7 @@ public class PlayerActor extends WidgetGroup {
     private final Label nameLabel;
     private final Label balanceLabel;
     private final List<CardActor> backActors = new ArrayList<>();
+    private final List<CardActor> handCardActors = new ArrayList<>();
     private Label betLabel;
 
     private final float avatarSize = 64;
@@ -67,7 +70,42 @@ public class PlayerActor extends WidgetGroup {
             ca.setVisible(false); // Прячем карты, но не удаляем их
         }
     }
+    public void showHandCards(List<Card> hand) {
+        clearHandCards();
+        float cardStartX = avatarOffsetX - 10;
+        float cardStartY = 25;
 
+        for (int i = 0; i < hand.size(); i++) {
+            Card card = hand.get(i);
+            CardActor actor = new CardActor(card);
+            actor.setSize(cardWidth, cardHeight);
+            actor.setPosition(cardStartX + i * (cardWidth - 35), cardStartY);
+            handCardActors.add(actor);
+            addActor(actor);
+        }
+    }
+    public void highlightWinningCards(List<Card> winningCards) {
+        Color glowColor = new Color(1, 1, 0, 0.6f);
+        for (CardActor card : getCardActors()) {
+            if (winningCards.contains(card.getCard())) {
+                card.addAction(Actions.sequence(
+                    Actions.color(glowColor, 0.3f),
+                    Actions.delay(1f),
+                    Actions.color(Color.WHITE, 0.3f)
+                ));
+            }
+        }
+    }
+
+    public void clearHandCards() {
+        for (CardActor card : handCardActors) {
+            card.remove();
+        }
+        handCardActors.clear();
+    }
+    public List<CardActor> getCardActors() {
+        return handCardActors;
+    }
     public void updateBalance(double newBalance) {
         balanceLabel.setText((int) newBalance + "$");
     }

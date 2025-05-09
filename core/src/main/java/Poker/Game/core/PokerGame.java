@@ -2,10 +2,13 @@ package Poker.Game.core;
 
 import Poker.Game.PacketsClasses.GameStats;
 import Poker.Game.PacketsClasses.Logger;
+import Poker.Game.PacketsClasses.WinnerInfo;
 import Poker.Game.Server.PokerServer;
 import com.esotericsoftware.kryonet.Server;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 // Main Game Manager Class
@@ -102,6 +105,11 @@ public class PokerGame {
         this.bettingPhase = BettingManager.BettingPhase.RIVER;
 
         determineWinner();
+        try {
+            Thread.sleep(2500);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         resetBets();
         endRound();
     }
@@ -128,6 +136,17 @@ public class PokerGame {
             pokerServer.sendChatMessage("Everybody folded!");
             System.out.println(winner.getName() + " wins " + totalPot + "!");
             pokerServer.sendChatMessage(winner.getName() + " wins " + totalPot + "!");
+            List<Integer> winnerIds = Arrays.asList(winner.getConnectionId());
+            List<List<Card>> winningCardsList = Arrays.asList(Collections.emptyList());
+            List<String> combinationNamesList = Arrays.asList("Won by Fold");
+
+            WinnerInfo info = new WinnerInfo(
+                winnerIds,
+                winningCardsList,
+                combinationNamesList,
+                totalPot
+            );
+            server.sendToAllTCP(info);
             return;
         }
 
@@ -163,6 +182,7 @@ public class PokerGame {
         if (sidePot.getAmount() <= 0) {
             return; // Пропускаем пустые сайд-поты
         }
+
         int maxHandValue = -1;
         for (Player p : sidePot.getEligiblePlayers()) {
             int handValue = p.getHandValue();
@@ -180,12 +200,32 @@ public class PokerGame {
 
         double splitPot = sidePot.getAmount() / winners.size();
 
+        // Распределяем деньги
         for (Player winner : winners) {
             winner.increaseBalance(splitPot);
-            System.out.println(winner.getName() + " wins " + splitPot);
-
+            System.out.println(winner.getName() + " wins side pot of " + splitPot);
         }
+        // Готовим WinnerInfo для нескольких победителей
+        List<Integer> winnerIds = new ArrayList<>();
+        List<List<Card>> winningCardsList = new ArrayList<>();
+        List<String> combinationNamesList = new ArrayList<>();
+
+        for (Player winner : winners) {
+            winnerIds.add(winner.getConnectionId());
+            winningCardsList.add(winner.getCombination());
+            combinationNamesList.add(winner.getNameofCombination());
+        }
+
+        WinnerInfo info = new WinnerInfo(
+            winnerIds,
+            winningCardsList,
+            combinationNamesList,
+            splitPot
+        );
+
+        server.sendToAllTCP(info);
     }
+
 
     /**
      * Метод для распределения выигрыша из основного банка

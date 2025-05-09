@@ -1,6 +1,5 @@
 package Poker.Game.PacketsClasses;
 
-import Poker.Game.Client.PokerClient;
 import Poker.Game.core.*;
 import com.esotericsoftware.kryo.Kryo;
 
@@ -12,6 +11,7 @@ import java.util.List;
 public class Network {
     public static void register(Kryo kryo) {
         kryo.register(ArrayList.class);
+        kryo.register(WinnerInfo.class);
         kryo.register(FoldNotification.class);
         kryo.register(PotUpdate.class);
         kryo.register(PlayerBetUpdate.class);

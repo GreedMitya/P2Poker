@@ -17,7 +17,7 @@ public interface ClientListener {
     void onTableCardsInfo(TableCardsInfo tableCardsInfo);
     void onChatMessage(ChatMessage message);
     void onPlayerBetUpdate(PlayerBetUpdate update);
-    void onClearBets();
+    void onWinnerInfo(WinnerInfo info);
     void onPotUpdate(PotUpdate potUpdate);
     void onPlayerFold(FoldNotification notif);
 

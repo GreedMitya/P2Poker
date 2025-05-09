@@ -1,6 +1,7 @@
 package Poker.Game;
 
 import Poker.Game.core.Card;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -10,6 +11,7 @@ public class CardActor extends Actor {
     private final TextureRegion faceTexture;
     private static TextureRegion backTexture;
     private boolean faceDown = false;
+    private boolean highlighted = false;
 
     public CardActor(Card card) {
         this.card = card;
@@ -34,6 +36,17 @@ public class CardActor extends Actor {
 
     public boolean isFaceDown() {
         return faceDown;
+    }
+    public Card getCard() {
+        return card;
+    }
+    public void setHighlight(boolean highlight) {
+        this.highlighted = highlight;
+        if (highlight) {
+            this.setColor(Color.GOLD); // Подсветка жёлтым
+        } else {
+            this.setColor(Color.WHITE); // Обычный цвет
+        }
     }
 
     @Override

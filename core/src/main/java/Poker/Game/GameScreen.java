@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.*;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
@@ -20,6 +21,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 import java.util.*;
 import java.util.List;
+
 
 public class GameScreen implements Screen, Poker.Game.ClientListener {
     private final PokerApp app;
@@ -95,6 +97,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         // Пот
         potLabel = new Label("Pot: 0", skin);
         potLabel.setFontScale(1.2f);
+        potLabel.setColor(Color.GOLD);
         potLabel.setPosition(stage.getWidth()/2f - potLabel.getWidth()/2f,
             stage.getHeight()/2f + 100);
         stage.addActor(potLabel);
@@ -321,12 +324,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             if (pa != null) pa.showBet(upd.amount);
         });
     }
-    @Override
-    public void onClearBets() {
-        Gdx.app.postRunnable(() -> {
-            for (PlayerActor pa : playerActorsById.values()) pa.clearBet();
-        });
-    }
+
+
 
     @Override
     public void onBlinds(BlindsNotification note) {
@@ -375,11 +374,11 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void onTableCardsInfo(TableCardsInfo tableCardsInfo) {
         Gdx.app.postRunnable(() -> showTableCards(tableCardsInfo.getCards()));
     }
+
     @Override
     public void onPotUpdate(PotUpdate update) {
         updatePot(update.getPotAmount());
     }
-
 
     public void onChatMessage(ChatMessage object) {
         Gdx.app.postRunnable(() -> {
@@ -411,6 +410,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     }
 
     // Показывает собственные две карты игрока
+
     private void showPlayerCards(List<Card> hand) {
         for (CardActor actor : playerCardActors) {
             actor.remove();
@@ -430,7 +430,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             playerCardActors.add(cardActor);
         }
     }
-
 
     private void showTableCards(ArrayList<Card> tableCards) {
         // Удаляем старые карты со стола
@@ -473,6 +472,127 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             }
         });
     }
+    private List<Card> flattenCardLists(List<List<Card>> nested) {
+        List<Card> flatList = new ArrayList<>();
+        for (List<Card> inner : nested) {
+            if (inner != null) {
+                flatList.addAll(inner);
+            }
+        }
+        return flatList;
+    }
+
+
+    @Override
+    public void onWinnerInfo(WinnerInfo info) {
+        Gdx.app.postRunnable(() -> {
+            showWinnersAnimation(
+                info.playerIds,
+                flattenCardLists(info.winningCards), // если ты хочешь выделять общие карты
+                info.amountWon,
+                info.combinationNames
+            );
+        });
+    }
+
+
+    public void showWinnersAnimation(List<Integer> winnerIds, List<Card> winningCards, double totalPotAmount, List<String> combinationNames) {
+        Gdx.app.postRunnable(() -> {
+            // 1. Скрываем пот
+            potLabel.setVisible(false);
+
+            // 2. Подсветка карт
+            highlightWinningCards(winningCards, winnerIds);
+
+            // 3. Делим банк
+            double portion = totalPotAmount / winnerIds.size();
+            for (Integer id : winnerIds) {
+                animatePotToWinner(id, portion);
+            }
+
+            // 4. Показать комбинацию для каждого победителя
+            for (int i = 0; i < winnerIds.size(); i++) {
+                Integer id = winnerIds.get(i);
+                String comboName = combinationNames.get(i);
+                PlayerActor player = playerActorsById.get(id);
+                if (player != null) {
+                    showWinningComboText(player, comboName); // Показать комбинацию для каждого победителя
+                }
+            }
+
+            // 5. Вернуть пот через 2.5 секунды
+            stage.addAction(Actions.sequence(
+                Actions.delay(2.5f),
+                Actions.run(() -> potLabel.setVisible(true))
+            ));
+        });
+    }
+
+
+
+
+    private void highlightWinningCards(List<Card> winningCards, List<Integer> winnerIds) {
+        Color glowColor = new Color(1, 1, 0, 0.6f);
+
+        for (CardActor actor : tableCardActors) {
+            if (winningCards.contains(actor.getCard())) {
+                actor.addAction(Actions.sequence(
+                    Actions.color(glowColor, 0.3f),
+                    Actions.delay(1f),
+                    Actions.color(Color.WHITE, 0.3f)
+                ));
+            }
+        }
+
+        for (int id : winnerIds) {
+            PlayerActor player = playerActorsById.get(id);
+            if (player != null) {
+                player.highlightWinningCards(winningCards); // Вот он — правильный вызов
+            }
+        }
+    }
+
+
+    private void animatePotToWinner(int winnerId, double potAmount) {
+        Label flyingPot = new Label("+" + potAmount + "$", skin);
+        flyingPot.setFontScale(1.5f);
+        flyingPot.setColor(Color.GOLD);
+        flyingPot.setPosition(tableCenterX, tableCenterY);
+        stage.addActor(flyingPot);
+
+        PlayerActor winner = playerActorsById.get(winnerId);
+        if (winner == null) return;
+
+        float targetX = winner.getX() + winner.getWidth() / 2f;
+        float targetY = winner.getY() + winner.getHeight() / 2f;
+
+        flyingPot.addAction(Actions.sequence(
+            Actions.moveTo(targetX, targetY, 1f),
+            Actions.fadeOut(0.5f),
+            Actions.run(flyingPot::remove)
+        ));
+    }
+    private void showWinningComboText(PlayerActor player, String comboName) {
+        // Создаем лейбл с именем комбинации
+        Label comboLabel = new Label(comboName, skin);
+        comboLabel.setColor(Color.YELLOW); // Цвет текста
+        comboLabel.setFontScale(1.2f); // Размер шрифта
+
+        // Позиционируем лейбл на экране относительно игрока
+        float xPos = player.getX() + player.getWidth() / 2f;
+        float yPos = player.getY() + player.getHeight() + 10; // Немного выше аватара
+
+        comboLabel.setPosition(xPos, yPos, Align.center);
+        stage.addActor(comboLabel);
+
+        // Добавляем анимацию для текста (движение и исчезновение)
+        comboLabel.addAction(Actions.sequence(
+            Actions.moveBy(0, 20, 1f), // Двигаем текст вверх
+            Actions.fadeOut(1f), // Плавно исчезаем
+            Actions.run(comboLabel::remove) // Убираем лейбл после завершения
+        ));
+    }
+
 
 }
 
