@@ -1,15 +1,12 @@
 package Poker.Game.core;
 
+import Poker.Game.PacketsClasses.EndOfHandPacket;
 import Poker.Game.PacketsClasses.GameStats;
 import Poker.Game.PacketsClasses.Logger;
-import Poker.Game.PacketsClasses.WinnerInfo;
 import Poker.Game.Server.PokerServer;
 import com.esotericsoftware.kryonet.Server;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 // Main Game Manager Class
 public class PokerGame {
@@ -65,6 +62,34 @@ public class PokerGame {
             player.setCurrentBetFromPlayers(0);
         }
     }
+    private void sendEndOfHandPacket(List<Player> winners, double totalPot) {
+        Map<Integer, List<Card>> handsByPlayerId = new HashMap<>();
+        for (Player player : activePlayers) {
+            if (!player.isFolded()) {
+                handsByPlayerId.put(player.getConnectionId(), player.getHand());
+            }
+        }
+
+        List<Integer> winnerIds = new ArrayList<>();
+        List<List<Card>> winningCardsList = new ArrayList<>();
+        List<String> combinationNamesList = new ArrayList<>();
+
+        for (Player winner : winners) {
+            winnerIds.add(winner.getConnectionId());
+            winningCardsList.add(winner.getCombination()); // карты, из которых составлена комба
+            combinationNamesList.add(winner.getNameofCombination());
+        }
+
+        EndOfHandPacket packet = new EndOfHandPacket();
+        // через сеттеры
+        packet.setHandsByPlayerId(handsByPlayerId);
+        packet.setWinnerIds(winnerIds);
+        packet.setWinningCards(winningCardsList);
+        packet.setCombinationNames(combinationNamesList);
+        packet.setAmountWon(totalPot); // общий банк
+
+        server.sendToAllTCP(packet);
+    }
 
     private void playRound() {
         bettingManager.setBlinds();
@@ -106,7 +131,7 @@ public class PokerGame {
 
         determineWinner();
         try {
-            Thread.sleep(2500);
+            Thread.sleep(8500);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -136,17 +161,6 @@ public class PokerGame {
             pokerServer.sendChatMessage("Everybody folded!");
             System.out.println(winner.getName() + " wins " + totalPot + "!");
             pokerServer.sendChatMessage(winner.getName() + " wins " + totalPot + "!");
-            List<Integer> winnerIds = Arrays.asList(winner.getConnectionId());
-            List<List<Card>> winningCardsList = Arrays.asList(Collections.emptyList());
-            List<String> combinationNamesList = Arrays.asList("Won by Fold");
-
-            WinnerInfo info = new WinnerInfo(
-                winnerIds,
-                winningCardsList,
-                combinationNamesList,
-                totalPot
-            );
-            server.sendToAllTCP(info);
             return;
         }
 
@@ -172,6 +186,7 @@ public class PokerGame {
 
             // Распределяем основной банк
             distributeMainPot(activePlayersList, mainPot);
+            sendEndOfHandPacket(activePlayersList, potManager.getTotalPot());
         }
     }
 
@@ -215,15 +230,6 @@ public class PokerGame {
             winningCardsList.add(winner.getCombination());
             combinationNamesList.add(winner.getNameofCombination());
         }
-
-        WinnerInfo info = new WinnerInfo(
-            winnerIds,
-            winningCardsList,
-            combinationNamesList,
-            splitPot
-        );
-
-        server.sendToAllTCP(info);
     }
 
 

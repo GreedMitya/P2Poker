@@ -24,38 +24,48 @@ public class CardActor extends Actor {
             this.faceTexture = CardTextureManager.getTexture(card);
             setSize(faceTexture.getRegionWidth(), faceTexture.getRegionHeight());
         } else {
-            this.faceTexture = null; // Не нужен, мы рисуем только рубашку
+            this.faceTexture = null; // Для рубашки
             setSize(backTexture.getRegionWidth(), backTexture.getRegionHeight());
-            faceDown = true; // рубашка по умолчанию
+            faceDown = true;
         }
+    }
+
+    // Новые методы для «переворота» карты
+    public void showBack() {
+        setFaceDown(true);
+    }
+
+    public void showFront() {
+        setFaceDown(false);
     }
 
     public void setFaceDown(boolean faceDown) {
         this.faceDown = faceDown;
     }
-
     public boolean isFaceDown() {
         return faceDown;
     }
+
     public Card getCard() {
         return card;
     }
+
     public void setHighlight(boolean highlight) {
         this.highlighted = highlight;
         if (highlight) {
-            this.setColor(Color.GOLD); // Подсветка жёлтым
+            this.setColor(Color.GOLD);
         } else {
-            this.setColor(Color.WHITE); // Обычный цвет
+            this.setColor(Color.WHITE);
         }
     }
 
     @Override
     public void draw(Batch batch, float parentAlpha) {
-
-        batch.setColor(1, 1, 1, parentAlpha);
-        TextureRegion texture = faceDown ? backTexture : faceTexture;
-        if (texture != null) {
-            batch.draw(texture, getX(), getY(), getWidth(), getHeight());
+        batch.setColor(getColor().r, getColor().g, getColor().b, parentAlpha);
+        TextureRegion tex = faceDown ? backTexture : faceTexture;
+        if (tex != null) {
+            batch.draw(tex, getX(), getY(), getOriginX(), getOriginY(),
+                getWidth(), getHeight(), getScaleX(), getScaleY(), getRotation());
         }
     }
 }

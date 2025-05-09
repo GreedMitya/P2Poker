@@ -112,8 +112,8 @@ public class PokerClient {
                     listener.onPotUpdate((PotUpdate) object);
                 }else if (object instanceof FoldNotification) {
                     listener.onPlayerFold((FoldNotification) object);
-                }else if (object instanceof WinnerInfo) {
-                    listener.onWinnerInfo((WinnerInfo) object);
+                }else if(object instanceof EndOfHandPacket){
+                    listener.onEndOfHandPacket((EndOfHandPacket) object);
                 }
             }
 

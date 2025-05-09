@@ -3,15 +3,18 @@ package Poker.Game.PacketsClasses;
 import Poker.Game.core.*;
 import com.esotericsoftware.kryo.Kryo;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 public class Network {
     public static void register(Kryo kryo) {
+        kryo.register(Integer.class);
+        kryo.register(String[].class);
+        kryo.register(String.class);
         kryo.register(ArrayList.class);
-        kryo.register(WinnerInfo.class);
+        kryo.register(List.class);
+        kryo.register(Map.class);
+        kryo.register(HashMap.class);
+        kryo.register(EndOfHandPacket.class);
         kryo.register(FoldNotification.class);
         kryo.register(PotUpdate.class);
         kryo.register(PlayerBetUpdate.class);
@@ -19,11 +22,7 @@ public class Network {
         kryo.register(TableCardsInfo.class);
         kryo.register(ChatMessage.class);
         kryo.register(PlayerAction.class);
-        kryo.register(HashMap.class);
         kryo.register(LinkedList.class);
-        kryo.register(List.class);
-        kryo.register(String.class);
-        kryo.register(String[].class);
         kryo.register(Logger.class);
         kryo.register(JoinRequest.class);
         kryo.register(JoinResponse.class);
@@ -33,7 +32,6 @@ public class Network {
         kryo.register(Poker.Game.PacketsClasses.Action.class);
         kryo.register(Poker.Game.PacketsClasses.ActionRequest.class);
         kryo.register(Poker.Game.PacketsClasses.ActionResponse.class);
-        kryo.register(ArrayList.class);
         kryo.register(KeepAlive.class);
         kryo.register(Card.Rank.class);
         kryo.register(Card.Suit.class);
@@ -58,10 +56,5 @@ public class Network {
         kryo.register(SidePot.class);
         kryo.register(HandEvaluatorTest.class);
         kryo.register(PlayerBalanceUpdate.class);
-
-
-
-
-
     }
 }
