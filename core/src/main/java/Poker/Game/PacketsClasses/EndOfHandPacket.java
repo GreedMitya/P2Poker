@@ -7,10 +7,12 @@ import java.util.Map;
 
 public class EndOfHandPacket {
     private Map<Integer, List<Card>> handsByPlayerId;
+    private Map<Integer, Double> winningsByPlayerId;
     private List<Integer> winnerIds;
     private List<List<Card>> winningCards;
     private double amountWon;
     private List<String> combinationNames;
+
 
     // Геттеры
     public Map<Integer, List<Card>> getHandsByPlayerId() { return handsByPlayerId; }
@@ -40,6 +42,12 @@ public class EndOfHandPacket {
     }
 
     public EndOfHandPacket(){
+    }
+    public Map<Integer, Double> getWinningsByPlayerId() {
+        return winningsByPlayerId;
+    }
+    public void setWinningsByPlayerId(Map<Integer, Double> winningsByPlayerId) {
+        this.winningsByPlayerId = winningsByPlayerId;
     }
     public EndOfHandPacket(Map<Integer, List<Card>> handsByPlayerId) {
         this.handsByPlayerId = handsByPlayerId;

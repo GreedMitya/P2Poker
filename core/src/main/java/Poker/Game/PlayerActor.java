@@ -11,6 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PlayerActor extends WidgetGroup {
+    private final boolean isLocalPlayer;
+    private static final float CARD_WIDTH  = 90f;
+    private static final float CARD_HEIGHT = 134f;
+    private static final float CARD_GAP    = 50f;
     private final int playerId;
     private final Skin skin;
     private final Image avatarImage;
@@ -20,13 +24,14 @@ public class PlayerActor extends WidgetGroup {
     private final List<CardActor> handCardActors = new ArrayList<>();
     private Label betLabel;
 
-    private final float avatarSize = 64;
+    private final float avatarSize = 128;
     private final float cardWidth = 60, cardHeight = 82;
     private final float betLabelOffsetX = -35; // для позиционирования ставки слева от аватара
     private final float avatarOffsetX = 0;  // позиция аватара
     private final float cardSpacing = 5; // расстояние между картами
 
-    public PlayerActor(int playerId, String nickname, double balance, Texture avatarTexture, Skin skin) {
+    public PlayerActor(boolean isLocalPlayer, int playerId, String nickname, double balance, Texture avatarTexture, Skin skin) {
+        this.isLocalPlayer = isLocalPlayer;
         this.playerId = playerId;
         this.skin = skin;
 
@@ -50,16 +55,19 @@ public class PlayerActor extends WidgetGroup {
     }
 
     public void showCardBacks() {
+        if (isLocalPlayer || !handCardActors.isEmpty()) {
+            return;
+        }
         clearCardBacks();
-        float cardStartX = avatarOffsetX-10; // Начальная позиция для карт
+        float cardStartX = avatarOffsetX; // Начальная позиция для карт
         float cardStartY = 25; // Позиция карт над аватаром
 
         // Создаём карты
         for (int i = 0; i < 2; i++) {
             CardActor back = new CardActor(null);
-            back.setSize(cardWidth, cardHeight);
+            back.setSize(CARD_WIDTH, CARD_HEIGHT);
             back.setFaceDown(true);
-            back.setPosition(cardStartX + i * (cardWidth -35), cardStartY);
+            back.setPosition(cardStartX + i * (cardWidth), cardStartY);
             backActors.add(back);
             addActor(back);
         }
@@ -67,10 +75,13 @@ public class PlayerActor extends WidgetGroup {
 
     public void clearCardBacks() {
         for (CardActor ca : backActors) {
-            ca.setVisible(false); // Прячем карты, но не удаляем их
+            ca.remove();   // удаляем из сцены
         }
+        backActors.clear();
     }
+
     public void showHandCards(List<Card> hand) {
+        clearCardBacks();
         clearHandCards();
         float cardStartX = avatarOffsetX - 10;
         float cardStartY = 25;
@@ -78,7 +89,8 @@ public class PlayerActor extends WidgetGroup {
         for (int i = 0; i < hand.size(); i++) {
             Card card = hand.get(i);
             CardActor actor = new CardActor(card);
-            actor.setSize(cardWidth, cardHeight);
+            actor.setSize(CARD_WIDTH, CARD_HEIGHT);
+            actor.showFront();
             actor.setPosition(cardStartX + i * (cardWidth - 35), cardStartY);
             handCardActors.add(actor);
             addActor(actor);
@@ -141,5 +153,9 @@ public class PlayerActor extends WidgetGroup {
     @Override
     public float getPrefHeight() {
         return 200;  // Определяем размер по своему усмотрению
+    }
+
+    public boolean isLocalPlayer() {
+        return isLocalPlayer;
     }
 }

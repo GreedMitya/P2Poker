@@ -27,6 +27,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private final PokerApp app;
     private final PokerClient client;
     private final boolean isHost;
+    private int myPlayerId;
     // === Константы для карт ===
     private static final float CARD_WIDTH  = 90f;
     private static final float CARD_HEIGHT = 134f;
@@ -40,6 +41,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private List<String> currentPlayers = new ArrayList<>();
     private final Map<String, Double> playerBalances = new HashMap<>();
     // === Карты текущего игрока и оппонентов ===
+    private List<Card> myHand = new ArrayList<>();
     private final List<CardActor> playerCardActors = new ArrayList<>();
     private final Map<Integer, List<CardActor>> opponentCardActors = new HashMap<>();
     // === Карты на столе ===
@@ -57,15 +59,23 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private TextButton sendButton;
     // === Для управления потоком действий ===
     private int    currentPlayerId;
+    private boolean amI;
     private Action[] currentActions;
     // === Транзитные актёры (летящие поты, метки комбинаций) ===
     private final List<Actor> transientActors = new ArrayList<>();
-
     public GameScreen(PokerApp app, PokerClient client, boolean isHost) {
         this.app    = app;
         this.client = client;
         this.isHost = isHost;
         this.client.setListener(this);
+    }
+
+    public int getMyPlayerId() {
+        return myPlayerId;
+    }
+
+    public void setMyPlayerId(int myPlayerId) {
+        this.myPlayerId = myPlayerId;
     }
 
     @Override
@@ -231,6 +241,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     @Override
     public void onPlayerListUpdate(List<String> nicknames) {
         this.currentPlayers = nicknames;
+        setMyPlayerId(client.getMyId());
         Gdx.app.postRunnable(() -> {
             if (isHost && nicknames.size() >= 2) startBtn.setVisible(true);
         });
@@ -271,7 +282,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             String nick = players.get((myIndex + i) % total);
             int id      = client.getIdByNickname(nick);
 
-            PlayerActor pa = new PlayerActor(
+            boolean amI = (id == myPlayerId);
+            PlayerActor pa = new PlayerActor( amI,
                 id, nick,
                 playerBalances.getOrDefault(nick, 0.0),
                 avatarTexture, skin
@@ -286,10 +298,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             pa.setPosition(x, y);
             stage.addActor(pa);
             playerActorsById.put(id, pa);
-
-            if (id != client.getMyId()) {
-                pa.showCardBacks();
-            }
         }
     }
 
@@ -309,14 +317,14 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         });
     }
 
-
-
     @Override
     public void onBlinds(BlindsNotification note) {
         Gdx.app.postRunnable(() -> {
             addChatMessage(note.getSmallBlind());
             for (PlayerActor playerActor : playerActorsById.values()) {
-                playerActor.showCardBacks(); // Показываем рубашки карт
+                if (!playerActor.isLocalPlayer()) {
+                    playerActor.showCardBacks();
+                }
             }
         });
     }
@@ -388,31 +396,35 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     @Override
     public void onCardInfo(CardInfo info) {
         Gdx.app.postRunnable(() -> {
-            addChatMessage("Your cards: " + info.getHand());
-            showPlayerCards(info.getHand());
+            List<Card> hand = info.getHand();
+
+            // Находим своего игрока
+            PlayerActor me = playerActorsById.get(client.getMyId());
+            if (me != null) {
+                me.clearCardBacks();               // убирать рубашки, если они были
+                me.showHandCards(hand);            // показываем карты лицом
+            }
+
+            addChatMessage("Your cards: " + hand);
         });
     }
+
+
 
     @Override
     public void onEndOfHandPacket(EndOfHandPacket packet) {
         Gdx.app.postRunnable(() -> {
             Gdx.app.log("GameScreen", "onEndOfHandPacket ▶ " + packet);
-
-            if (packet.getHandsByPlayerId() == null || packet.getWinnerIds() == null) {
+            if (packet.getHandsByPlayerId() == null
+                || packet.getWinnerIds() == null
+                || packet.getWinningsByPlayerId() == null) {
                 Gdx.app.error("GameScreen", "EndOfHandPacket содержит null! Прерываем анимацию.");
                 return;
             }
-
-            // 1) Чистим старое
-            clearFloatingActors();
-            for (List<CardActor> list : opponentCardActors.values()) {
-                for (CardActor ca : list) ca.remove();
-            }
-            opponentCardActors.clear();
-
             // 2) Показываем карты игроков
             revealOpponentCards(packet.getHandsByPlayerId());
-            // 3) Ждём → показываем победителей
+
+            // 3) Ждём и показываем победителей
             stage.addAction(Actions.sequence(
                 Actions.delay(2.5f),
                 Actions.run(() -> {
@@ -420,12 +432,15 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                     showWinnersAnimation(
                         packet.getWinnerIds(),
                         packet.getWinningCards(),
-                        packet.getAmountWon(),
-                        packet.getCombinationNames()
+                        packet.getCombinationNames(),
+                        packet.getWinningsByPlayerId()
                     );
                     stage.addAction(Actions.sequence(
                         Actions.delay(2.5f),
-                        Actions.run(() -> potLabel.setVisible(true))
+                        Actions.run(() -> {
+                            clearFloatingActors();
+                            potLabel.setVisible(true);
+                        })
                     ));
                 })
             ));
@@ -435,6 +450,11 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private void revealOpponentCards(Map<Integer, List<Card>> handsByPlayerId) {
         for (Map.Entry<Integer, List<Card>> entry : handsByPlayerId.entrySet()) {
             int pid = entry.getKey();
+            // Пропускаем себя — свои карты не рисуем здесь
+            if (pid == currentPlayerId) {
+                continue;
+            }
+
             List<Card> hand = entry.getValue();
             PlayerActor pa = playerActorsById.get(pid);
             if (pa == null) continue;
@@ -442,7 +462,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             float startX = pa.getX() + pa.getWidth() / 2f - hand.size() * CARD_GAP / 2f;
             float y      = pa.getY() - CARD_HEIGHT - 20;
 
-            List<CardActor> actors = new ArrayList<CardActor>();
+            List<CardActor> actors = new ArrayList<>();
             for (int i = 0; i < hand.size(); i++) {
                 CardActor ca = new CardActor(hand.get(i));
                 ca.setSize(CARD_WIDTH, CARD_HEIGHT);
@@ -451,44 +471,42 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 stage.addActor(ca);
                 actors.add(ca);
 
-                // flip-анимация
                 final int index = i;
                 ca.addAction(Actions.sequence(
                     Actions.delay(0.2f * index),
                     Actions.rotateTo(90, 0.2f),
-                    Actions.run(new Runnable() {
-                        @Override
-                        public void run() {
-                            ca.showFront();
-                        }
-                    }),
-                    Actions.rotateTo(0, 0.2f)
+                    Actions.run(() -> ca.showFront()),
+                    Actions.rotateTo(0, 0.1f)
                 ));
             }
             opponentCardActors.put(pid, actors);
         }
     }
+
     public void showWinnersAnimation(
         List<Integer> winnerIds,
         List<List<Card>> winningCardsByWinner,
-        double totalPotAmount,
-        List<String> combinationNames
+        List<String> combinationNames,
+        Map<Integer, Double> winningsByPlayerId
     ) {
         if (winnerIds.isEmpty()) return;
 
-        double portion = totalPotAmount / winnerIds.size();
-
         for (int i = 0; i < winnerIds.size(); i++) {
             int id = winnerIds.get(i);
-            List<Card> cards = winningCardsByWinner.get(i);
-            String combo = combinationNames.get(i);
+            List<Card> combo = winningCardsByWinner.get(i);
+            String comboName = combinationNames.get(i);
+            double wonAmount = winningsByPlayerId.getOrDefault(id, 0.0);
 
-            highlightWinningCardsForPlayer(id, cards);
-            animatePotToWinner(id, portion);
+            // Подсветить выигрышные карты
+            highlightWinningCardsForPlayer(id, combo);
 
+            // Анимация фишек/банка к победителю
+            animatePotToWinner(id, wonAmount);
+
+            // Текст с названием комбинации и суммой
             PlayerActor p = playerActorsById.get(id);
             if (p != null) {
-                showWinningComboText(p, combo);
+                showWinningComboText(p, comboName);
             }
         }
     }
@@ -496,7 +514,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private void highlightWinningCardsForPlayer(int playerId, List<Card> winningCards) {
         Color glow = new Color(1, 1, 0, 0.6f);
 
-        // Подсвечиваем общие карты на столе
+        // Подсветка общих карт
         for (CardActor ca : tableCardActors) {
             if (winningCards.contains(ca.getCard())) {
                 ca.addAction(Actions.sequence(
@@ -515,7 +533,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     }
 
     private void animatePotToWinner(int winnerId, double potAmount) {
-        Label flyingPot = new Label("+"+potAmount+"$", skin);
+        if (potAmount == 0) return;
+        Label flyingPot = new Label("+" + String.format("%.0f", potAmount) + "$", skin);
         flyingPot.setFontScale(1.5f);
         flyingPot.setColor(Color.GOLD);
         flyingPot.setPosition(tableCenterX, tableCenterY);
@@ -523,9 +542,9 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         transientActors.add(flyingPot);
 
         PlayerActor w = playerActorsById.get(winnerId);
-        if (w!=null) {
-            float tx = w.getX()+w.getWidth()/2f;
-            float ty = w.getY()+w.getHeight()/2f;
+        if (w != null) {
+            float tx = w.getX() + w.getWidth() / 2f;
+            float ty = w.getY() + w.getHeight() / 2f;
             flyingPot.addAction(Actions.sequence(
                 Actions.moveTo(tx, ty, 1f),
                 Actions.fadeOut(0.5f),
@@ -536,14 +555,18 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             ));
         }
     }
+
     private void showWinningComboText(PlayerActor player, String comboName) {
-        Label combo = new Label(comboName, skin);
+        String text = String.format("%s",
+            comboName
+        );
+        Label combo = new Label(text, skin);
         combo.setColor(Color.YELLOW);
         combo.setFontScale(1.2f);
         combo.pack();
-        float x = player.getX() + player.getWidth()/2f - combo.getWidth()/2f;
+        float x = player.getX() + player.getWidth() / 2f - combo.getWidth() / 2f;
         float y = player.getY() + player.getHeight() + 10;
-        combo.setPosition(x,y);
+        combo.setPosition(x, y);
         stage.addActor(combo);
         transientActors.add(combo);
 
@@ -558,43 +581,27 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             })
         ));
     }
+
     private void clearFloatingActors() {
+        // Удаляем все transient-акторы
         for (Actor a : transientActors) {
-            if (a != null && a.hasParent()) {
-                a.remove();
-            }
+            if (a.hasParent()) a.remove();
         }
         transientActors.clear();
 
-        // Дополнительно подчистим акторов в opponentCardActors
+        // Удаляем выложенные карты оппонентов
         for (List<CardActor> list : opponentCardActors.values()) {
             for (CardActor ca : list) {
-                if (ca != null && ca.hasParent()) {
-                    ca.remove();
-                }
+                if (ca.hasParent()) ca.remove();
             }
         }
         opponentCardActors.clear();
 
-        // И если ты хочешь гарантировать очистку всех карт игроков:
+        // Если есть свои карты или карты стола — тоже убираем
         playerCardActors.forEach(Actor::remove);
         playerCardActors.clear();
-
         tableCardActors.forEach(Actor::remove);
         tableCardActors.clear();
-    }
-
-    private void showPlayerCards(List<Card> hand) {
-        playerCardActors.forEach(Actor::remove);
-        playerCardActors.clear();
-        float spacing = 40, startX = tableCenterX - spacing +16, y = 135;
-        for (int i=0;i<hand.size();i++) {
-            CardActor ca = new CardActor(hand.get(i));
-            ca.setSize(CARD_WIDTH,CARD_HEIGHT);
-            ca.setPosition(startX + i*spacing, y);
-            stage.addActor(ca);
-            playerCardActors.add(ca);
-        }
     }
     private void showTableCards(List<Card> tableCards) {
         tableCardActors.forEach(Actor::remove);
@@ -624,15 +631,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 potLabel.setText("Pot: " + potValue + "$");
             }
         });
-    }
-    private List<Card> flattenCardLists(List<List<Card>> nested) {
-        List<Card> out = new ArrayList<Card>();
-        for (List<Card> inner : nested) {
-            if (inner != null) {
-                out.addAll(inner);
-            }
-        }
-        return out;
     }
 }
 

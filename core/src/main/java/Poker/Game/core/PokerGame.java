@@ -62,35 +62,6 @@ public class PokerGame {
             player.setCurrentBetFromPlayers(0);
         }
     }
-    private void sendEndOfHandPacket(List<Player> winners, double totalPot) {
-        Map<Integer, List<Card>> handsByPlayerId = new HashMap<>();
-        for (Player player : activePlayers) {
-            if (!player.isFolded()) {
-                handsByPlayerId.put(player.getConnectionId(), player.getHand());
-            }
-        }
-
-        List<Integer> winnerIds = new ArrayList<>();
-        List<List<Card>> winningCardsList = new ArrayList<>();
-        List<String> combinationNamesList = new ArrayList<>();
-
-        for (Player winner : winners) {
-            winnerIds.add(winner.getConnectionId());
-            winningCardsList.add(winner.getCombination()); // карты, из которых составлена комба
-            combinationNamesList.add(winner.getNameofCombination());
-        }
-
-        EndOfHandPacket packet = new EndOfHandPacket();
-        // через сеттеры
-        packet.setHandsByPlayerId(handsByPlayerId);
-        packet.setWinnerIds(winnerIds);
-        packet.setWinningCards(winningCardsList);
-        packet.setCombinationNames(combinationNamesList);
-        packet.setAmountWon(totalPot); // общий банк
-
-        server.sendToAllTCP(packet);
-    }
-
     private void playRound() {
         bettingManager.setBlinds();
         bettingManager.startBettingRound(BettingManager.BettingPhase.PRE_FLOP);
@@ -131,7 +102,7 @@ public class PokerGame {
 
         determineWinner();
         try {
-            Thread.sleep(8500);
+            Thread.sleep(5500);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -152,75 +123,71 @@ public class PokerGame {
     private synchronized void determineWinner() {
         List<SidePot> sidePots = potManager.getSidePots();
         double mainPot = potManager.getMainPot();
+        double totalPot = potManager.getTotalPot();
 
-        if (activePlayers.size() == 1) {
-            Player winner = activePlayers.get(0);
-            double totalPot = potManager.getTotalPot(); // Метод должен суммировать все сайд-поты
-            winner.increaseBalance(totalPot);
-            System.out.println("Everybody folded!");
+        // Здесь будем собирать, кто сколько унес
+        Map<Integer, Double> winningsByPlayerId = new HashMap<>();
+
+        // 1) Если все сбросились
+        List<Player> alive = new ArrayList<>();
+        for (Player p : playerManager.getActivePlayers()) {
+            if (!p.isFolded()) alive.add(p);
+        }
+        if (alive.size() == 1) {
+            Player sole = alive.get(0);
+            sole.increaseBalance(totalPot);
+            winningsByPlayerId.put(sole.getConnectionId(), totalPot);
+
             pokerServer.sendChatMessage("Everybody folded!");
-            System.out.println(winner.getName() + " wins " + totalPot + "!");
-            pokerServer.sendChatMessage(winner.getName() + " wins " + totalPot + "!");
+            pokerServer.sendChatMessage(sole.getName() + " wins " + totalPot + "!");
+
+            // Отправляем пакет и выходим
+            sendEndOfHandPacket(alive, totalPot, winningsByPlayerId);
             return;
         }
 
+        // 2) На ривере: собираем и оцениваем руки
         if (bettingPhase.equals(BettingManager.BettingPhase.RIVER)) {
-            // Вычисляем руки для всех оставшихся игроков
-            List<Player> activePlayersList = new ArrayList<>();
+            List<Player> contenders = new ArrayList<>();
             for (Player p : playerManager.getActivePlayers()) {
                 if (!p.isFolded()) {
-                    new HandCollector(p, table); // Собираем карты на руках
+                    new HandCollector(p, table);
                     p.setTotalHand();
                     p.evaluateHand();
                     p.setCombination();
-                    System.out.println(p.getName() + ": " + p.getCombination() + "; " + p.getNameofCombination() + ";");
-                    pokerServer.sendChatMessage(p.getName() + ": " + p.getCombination() + "; " + p.getNameofCombination() + ";");
-                    activePlayersList.add(p);
+                    pokerServer.sendChatMessage(
+                        p.getName() + ": " +p.getCombination()+ ";" + p.getNameofCombination()
+                    );
+                    contenders.add(p);
                 }
             }
 
-            // Распределяем сайд-поты
-            for (SidePot sidePot : sidePots) {
-                distributePot(sidePot);
+            // 3) Распределяем каждый сайд-пот и помним, кто сколько получил
+            for (SidePot sp : sidePots) {
+                distributePot(sp, winningsByPlayerId);
             }
+            // 4) Распределяем основной банк
+            distributeMainPot(contenders, mainPot, winningsByPlayerId);
 
-            // Распределяем основной банк
-            distributeMainPot(activePlayersList, mainPot);
-            sendEndOfHandPacket(activePlayersList, potManager.getTotalPot());
+            // 5) Всё, отправляем пакет
+            sendEndOfHandPacket(contenders, totalPot, winningsByPlayerId);
         }
     }
 
-    /**
-     * Метод для распределения выигрыша из сайд-пота
-     */
-    private void distributePot(SidePot sidePot) {
-        if (sidePot.getAmount() <= 0) {
-            return; // Пропускаем пустые сайд-поты
+
+    // в классе PokerGame
+    private void sendEndOfHandPacket(
+        List<Player> winners,
+        double totalPot,
+        Map<Integer, Double> winningsByPlayerId) {
+
+        // 1) Собираем все руки
+        Map<Integer, List<Card>> handsByPlayerId = new HashMap<>();
+        for (Player player : playerManager.getActivePlayers()) {
+            handsByPlayerId.put(player.getConnectionId(), player.getHand());
         }
 
-        int maxHandValue = -1;
-        for (Player p : sidePot.getEligiblePlayers()) {
-            int handValue = p.getHandValue();
-            if (handValue > maxHandValue) {
-                maxHandValue = handValue;
-            }
-        }
-
-        List<Player> winners = new ArrayList<>();
-        for (Player p : sidePot.getEligiblePlayers()) {
-            if (p.getHandValue() == maxHandValue) {
-                winners.add(p);
-            }
-        }
-
-        double splitPot = sidePot.getAmount() / winners.size();
-
-        // Распределяем деньги
-        for (Player winner : winners) {
-            winner.increaseBalance(splitPot);
-            System.out.println(winner.getName() + " wins side pot of " + splitPot);
-        }
-        // Готовим WinnerInfo для нескольких победителей
+        // 2) Список победителей + их комбы
         List<Integer> winnerIds = new ArrayList<>();
         List<List<Card>> winningCardsList = new ArrayList<>();
         List<String> combinationNamesList = new ArrayList<>();
@@ -230,38 +197,71 @@ public class PokerGame {
             winningCardsList.add(winner.getCombination());
             combinationNamesList.add(winner.getNameofCombination());
         }
+
+        // 3) Заполняем пакет
+        EndOfHandPacket packet = new EndOfHandPacket();
+        packet.setHandsByPlayerId(handsByPlayerId);
+        packet.setWinnerIds(winnerIds);
+        packet.setWinningCards(winningCardsList);
+        packet.setCombinationNames(combinationNamesList);
+        packet.setAmountWon(totalPot);
+        packet.setWinningsByPlayerId(winningsByPlayerId);  // <—
+
+        // 4) Шлём всем клиентам
+        server.sendToAllTCP(packet);
     }
 
 
     /**
-     * Метод для распределения выигрыша из основного банка
+     * Метод для распределения выигрыша из сайд-пота
      */
-    private void distributeMainPot(List<Player> activePlayers, double mainPot) {
-        if (mainPot <= 0) {
-            return; // Пропускаем пустые банки
-        }
-        int maxHandValue = -1;
-        for (Player p : activePlayers) {
-            int handValue = p.getHandValue();
-            if (handValue > maxHandValue) {
-                maxHandValue = handValue;
-            }
-        }
+    // side-pot
+    private void distributePot(SidePot sidePot, Map<Integer, Double> winningsMap) {
+        if (sidePot.getAmount() <= 0) return;
+
+        // 1) Найти лучших по handValue
+        int best = sidePot.getEligiblePlayers().stream()
+            .mapToInt(Player::getHandValue)
+            .max()
+            .orElse(-1);
 
         List<Player> winners = new ArrayList<>();
-        for (Player p : activePlayers) {
-            if (p.getHandValue() == maxHandValue) {
-                winners.add(p);
-            }
+        for (Player p : sidePot.getEligiblePlayers()) {
+            if (p.getHandValue() == best) winners.add(p);
         }
 
-        double mainSplitPot = mainPot / winners.size();
-
-        for (Player winner : winners) {
-            winner.increaseBalance(mainSplitPot);
-            System.out.println(winner.getName() + " wins main pot of " + mainSplitPot);
+        double share = sidePot.getAmount() / winners.size();
+        for (Player w : winners) {
+            w.increaseBalance(share);
+            winningsMap.merge(w.getConnectionId(), share, Double::sum);
         }
     }
+
+    // main pot
+    private void distributeMainPot(
+        List<Player> contenders,
+        double mainPot,
+        Map<Integer, Double> winningsMap) {
+
+        if (mainPot <= 0) return;
+
+        int best = contenders.stream()
+            .mapToInt(Player::getHandValue)
+            .max()
+            .orElse(-1);
+
+        List<Player> winners = new ArrayList<>();
+        for (Player p : contenders) {
+            if (p.getHandValue() == best) winners.add(p);
+        }
+
+        double share = mainPot / winners.size();
+        for (Player w : winners) {
+            w.increaseBalance(share);
+            winningsMap.merge(w.getConnectionId(), share, Double::sum);
+        }
+    }
+
 
     private void endRound() {
         System.out.println("Ending round...");

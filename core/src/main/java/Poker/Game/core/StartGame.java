@@ -43,7 +43,6 @@ public class StartGame {
             game.bettingManager.setPokerServer(pokerServer);
             game.playerManager.setServer(server);// ✅ теперь можно обращаться к её полям
             game.table.setServer(server);
-
             game.startGame(); // 🚀 запускаем игру
         } else {
             Logger.Game("Недостаточно игроков для начала");
