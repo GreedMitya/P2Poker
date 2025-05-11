@@ -80,7 +80,9 @@ public class HandEvaluator {
         for (Card card : totalHand) {
             ranks.add(card.getRank());
         }
-        return ranks.containsAll(Arrays.asList(Card.Rank.Ten, Card.Rank.Jack, Card.Rank.Queen, Card.Rank.King, Card.Rank.Ace));
+        return ranks.containsAll(new ArrayList<>(Arrays.asList(
+            Card.Rank.Ten, Card.Rank.Jack, Card.Rank.Queen, Card.Rank.King, Card.Rank.Ace
+        )));
     }
 
     private synchronized static List<Card> getRoyalFlushCard(List<Card> totalHand) {
@@ -301,7 +303,7 @@ public class HandEvaluator {
                 count = 1;
             }
         }
-        return cardRanks.containsAll(Arrays.asList(0, 1, 2, 3, 12));
+        return cardRanks.containsAll(new ArrayList<>(Arrays.asList(0, 1, 2, 3, 12)));
     }
 
     public synchronized static int getStraightValue(List<Card> hand) {
@@ -358,9 +360,10 @@ public class HandEvaluator {
         }
         List<Integer> wheel = Arrays.asList(-1, 0, 1, 2, 3);
         if (uniqueRanks.containsAll(wheel) && !uniqueRanks.contains(4)) {
-            bestStraight = Arrays.asList(
-                rankToCard.get(-1), rankToCard.get(0), rankToCard.get(1), rankToCard.get(2), rankToCard.get(3)
-            );
+            bestStraight = new ArrayList<>(Arrays.asList(
+                rankToCard.get(-1), rankToCard.get(0), rankToCard.get(1),
+                rankToCard.get(2), rankToCard.get(3)
+            ));
         }
         return bestStraight;
     }
