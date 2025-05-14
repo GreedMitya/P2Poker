@@ -2,7 +2,9 @@ package Poker.Game.Server;
 
 import Poker.Game.PacketsClasses.*;
 import Poker.Game.core.Player;
+import Poker.Game.core.PokerGame;
 import Poker.Game.core.StartGame;
+import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
@@ -15,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 public class PokerServer {
+    private final Map<Integer, Boolean> playerReadyStatus = new HashMap<>();
     private Server server;
     private StartGame startGame;
 
@@ -46,11 +49,15 @@ public class PokerServer {
 
 
             @Override
-            public void disconnected(Connection conn) {
-                String nick = String.valueOf(playerNicknames.remove(conn.getID()));
-                if (nick != null) {
-                    Logger.server("Игрок " + nick + " отключился");
-                    // Можно оповестить остальных
+            public void disconnected(Connection connection) {
+                Gdx.app.log("Server", "Client disconnected (id=" + connection.getID() + ")");
+                // Проверим, остались ли ещё активные клиенты
+                if (server.getConnections().size() == 0) {
+                    Gdx.app.log("Server", "No more clients, stopping server…");
+                    // Остановим сервер: закроем сокеты и потоки
+                    server.stop();
+                    // Если хотим — завершаем программу целиком
+                    //System.exit(0);
                 }
             }
 
@@ -61,7 +68,7 @@ public class PokerServer {
 
                 if (obj instanceof JoinRequest) {
                     JoinRequest req = (JoinRequest) obj;
-                    Logger.server("Игрок подключился: " + req.nickname);
+                    Logger.server("Player connected " + req.nickname);
                     playerNicknames.put(req.nickname,conn.getID());
 
                     Player player = new Player(req.nickname);
@@ -83,28 +90,57 @@ public class PokerServer {
                     } else {
                         Logger.server("‼ Нет pendingActions для " + resp.playerId);
                     }
-                }
-
-
-
-                else if (obj instanceof GameStartRequest) {
+                } else if (obj instanceof GameStartRequest) {
                     if (conn.getID() == 1 && startGame.getPlayers().size() >= 2) {
                         server.sendToAllTCP(new GameStartedNotification());
-                        Logger.server("Игра запущена хостом");
-                        new Thread(() -> startGame.startGame()).start();
-                        //startGame.startGame();
+                        Logger.server("Game started by host");
+                        new Thread(() -> {
+                            try {
+                                startGame.startGame(); // основной запуск игры
+                            } catch (Exception e) {
+                                Gdx.app.error("Server", "Ошибка при запуске игры: " + e.getMessage(), e);
+                                server.stop(); // остановим сервер, если что-то пошло не так
+                                System.exit(1); // опционально, если хочешь завершить JVM
+                            }
+                        }).start();
                     } else {
                         Logger.server("Нельзя запустить игру: не хост или мало игроков");
                     }
                 } else if (obj instanceof ChatMessage) {
                     ChatMessage mess = (ChatMessage) obj;
                     server.sendToAllTCP(mess);
+                }else if (obj instanceof ClientReadyForNextRound) {
+                    handleClientReadyForNextRound((ClientReadyForNextRound) obj);
+                } else if (obj instanceof RestartGameRequest) {
+                    RestartGameRequest req = (RestartGameRequest) obj;
+                    if (req.senderId == 1) { // Только хост
+                        Logger.server("↻ Получен Restart от хоста!");
+
+                        // 1. Обнулим всё
+                        playerNicknames.clear();
+                        pendingActions.clear();
+
+                        // 2. Перезапустим логику StartGame
+                        startGame = new StartGame();
+                        startGame.setServer(PokerServer.this);
+
+                        // 3. Всем клиентам: сказать, что произошёл рестарт
+                        server.sendToAllTCP(new ChatMessage("♻ Игра была перезапущена хостом", "sys"));
+                        server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
+                        server.sendToAllTCP(new RestartGameNotification());
+                    }
                 }
+
             }
         });
 
         server.bind(54555, 54777);  // выбирайте ваши порты
         server.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            Gdx.app.log("Server", "JVM shutdown hook: stopping server…");
+            server.stop();
+        }));
+
 
         // KeepAlive-пинг всем клиентам
         scheduler.scheduleAtFixedRate(() -> {
@@ -166,5 +202,28 @@ public class PokerServer {
 
     public void setServer(Server server) {
         this.server = server;
+    }
+    private void handleClientReadyForNextRound(ClientReadyForNextRound packet) {
+        int playerId = packet.getPlayerId();
+        boolean isReady = packet.isReady();
+        playerReadyStatus.put(playerId, isReady);
+
+        // Проверяем, все ли игроки готовы
+        if (areAllPlayersReady()) {
+            startNextRound();
+        }
+    }
+    private boolean areAllPlayersReady() {
+        for (Boolean isReady : playerReadyStatus.values()) {
+            if (!isReady) {
+                return false;
+            }
+        }
+        return true;
+    }
+    private void startNextRound() {
+        // Логика для начала нового раунда
+        System.out.println("Все игроки готовы. Начинаем новый раунд!");
+        startGame.getGame().startNextRound();
     }
 }

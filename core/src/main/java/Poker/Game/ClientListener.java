@@ -20,5 +20,5 @@ public interface ClientListener {
     void onPotUpdate(PotUpdate potUpdate);
     void onPlayerFold(FoldNotification notif);
     void onEndOfHandPacket(EndOfHandPacket packet);
-
+    void onGameRestart();
 }

@@ -7,8 +7,8 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 
 public class CardActor extends Actor {
-    private final Card card;
-    private final TextureRegion faceTexture;
+    private Card card;
+    private TextureRegion faceTexture;
     private static TextureRegion backTexture;
     private boolean faceDown = false;
     private boolean highlighted = false;
@@ -38,10 +38,16 @@ public class CardActor extends Actor {
     public void showFront() {
         setFaceDown(false);
     }
-
+    public void setCard(Card card) {
+        this.card = card;
+        this.faceTexture = CardTextureManager.getTexture(card);
+    }
     public void setFaceDown(boolean faceDown) {
         this.faceDown = faceDown;
+        // Увеличиваем размер карт
+        setSize(UIConfig.CARD_BASE_WIDTH*UIScale.ui, UIConfig.CARD_BASE_HEIGHT*UIScale.ui); // Примерно на 1.5x больше
     }
+
     public boolean isFaceDown() {
         return faceDown;
     }

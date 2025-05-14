@@ -112,21 +112,6 @@ public class BettingManager {
 
     }
 
-
-    /*public synchronized String getPlayerActionWithTimeout(Player player, int seconds) {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<String> future = executor.submit(player::getAction);
-
-        try {
-            return future.get(seconds, TimeUnit.SECONDS); // Ждём действие игрока
-        } catch (TimeoutException | InterruptedException | ExecutionException e) {
-            Logger.Game("Time out! ");
-            return (currentBet == 0 || player.getCurrentBetFromPlayer() == currentBet) ? "check" : "fold"; // Авто-действие
-        } finally {
-            executor.shutdown();
-        }
-    }
-     */
     public Action[] getAvailableActionsFor(Player player) {
         List<Action> list = new ArrayList<>();
         // всегда доступно «фолд»
@@ -311,7 +296,6 @@ public class BettingManager {
             roundEnded = checkIfRoundEnded();
         }
         System.out.println("Round " + phase + " finished!");
-        pokerServer.sendChatMessage("Round " + phase + " finished!");
         System.out.println("Total pot: " + pot);
         //potManager.setMainPot(pot);//Перемещаем пот с улицы в ПотМенеджер;
         // Дальше нужно реализовать перенос учавствовавших игроков и их ставки в ПотМенеджер;

@@ -9,29 +9,34 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.Interpolation;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.*;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
+import com.badlogic.gdx.scenes.scene2d.actions.SequenceAction;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
 
 import java.util.*;
 import java.util.List;
 
 
 public class GameScreen implements Screen, Poker.Game.ClientListener {
+    private static final float WORLD_WIDTH  = 1280f;
+    private static final float WORLD_HEIGHT = 720f;
+    private float cardWidth, cardHeight;
+    private float tableCenterX, tableCenterY, radius;
     // === Ссылки на приложение и клиент ===
     private final PokerApp app;
     private final PokerClient client;
     private final boolean isHost;
     private int myPlayerId;
-    // === Константы для карт ===
-    private static final float CARD_WIDTH  = 90f;
-    private static final float CARD_HEIGHT = 134f;
-    private static final float CARD_GAP    = 50f;
+    private static final float CARD_GAP    = 6f;
     // === Сцена, скин, текстуры ===
     private Stage stage;
     private Skin skin;
@@ -46,11 +51,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private final Map<Integer, List<CardActor>> opponentCardActors = new HashMap<>();
     // === Карты на столе ===
     private final List<CardActor> tableCardActors = new ArrayList<>();
-    private final float radius       = 250f;
-    private final float tableCenterX = Gdx.graphics.getWidth()  / 2f;
-    private final float tableCenterY = Gdx.graphics.getHeight() / 2f;
     // === UI: кнопки, слайдер, лейблы, чат ===
-    private TextButton startBtn, foldBtn, callBtn, raiseBtn, checkBtn;
+    private TextButton startBtn, foldBtn, callBtn, raiseBtn, checkBtn,restartBtn;
     private Slider    raiseSlider;
     private Label     raiseAmountLabel, potLabel;
     private Table     chatMessages;
@@ -85,19 +87,29 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
         // Сцена и фон
         avatarTexture = new Texture(Gdx.files.internal("sgx/raw/defaulrAvatar.png"));
-        stage = new Stage(new ScreenViewport());
+        FitViewport viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT);
+        stage = new Stage(viewport);
+
+
+        float worldW = viewport.getWorldWidth();
+        float worldH = viewport.getWorldHeight();
+        UIScale.ui = Math.min(worldW, worldH) / 800f;
+        float uiScale = UIScale.ui;
+        cardWidth  = UIConfig.CARD_BASE_WIDTH  * UIScale.ui;
+        cardHeight = UIConfig.CARD_BASE_HEIGHT * UIScale.ui;
+        radius     = Math.min(worldW, worldH) * 0.35f;
+        tableCenterX = worldW * 0.5f + worldW * 0.05f;
+        tableCenterY = worldH * 0.5f - worldH * 0.02f;
+
         Image bg = new Image(new Texture(Gdx.files.internal("sgx/raw/171.jpg")));
-        bg.setFillParent(true);
+        bg.setSize(WORLD_WIDTH, WORLD_HEIGHT);
+        bg.setPosition(0, 0);
         stage.addActor(bg);
 
         // Стол
         Texture tableTex = new Texture(Gdx.files.internal("sgx/raw/Atp.png"), true);
         tableTex.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        Image table = new Image(new TextureRegionDrawable(new com.badlogic.gdx.graphics.g2d.TextureRegion(tableTex)));
-        table.setSize(1000, 800);
-        table.setPosition((Gdx.graphics.getWidth()-1000+20)/2f,
-            (Gdx.graphics.getHeight()-800)/2f);
-        table.setTouchable(Touchable.disabled);
+        Image table = getTable(tableTex);
         stage.addActor(table);
 
         // Skin и ввод
@@ -107,7 +119,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
         // Пот
         potLabel = new Label("Pot: 0", skin);
-        potLabel.setFontScale(1.2f);
+        float fontScale = Math.min(Gdx.graphics.getWidth(), Gdx.graphics.getHeight()) / 800f;
+        potLabel.setFontScale(fontScale);
         potLabel.setColor(Color.GOLD);
         potLabel.setPosition(stage.getWidth()/2f - potLabel.getWidth()/2f,
             stage.getHeight()/2f + 100);
@@ -117,27 +130,81 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         setupChat();
     }
 
+    private Image getTable(Texture tableTex) {
+        float worldW = stage.getViewport().getWorldWidth();
+        float worldH = stage.getViewport().getWorldHeight();
+        Image table = new Image(new TextureRegionDrawable(new TextureRegion(tableTex)));
+        table.setSize(worldW * 0.9f, worldH * 0.9f);
+        table.setPosition((worldW - table.getWidth())/2f + worldW*0.05f,
+            (worldH - table.getHeight())/2f - worldH*0.02f);
+        table.setTouchable(Touchable.disabled);
+        return table;
+    }
+
+
     private void setupActionButtons() {
-        startBtn = new TextButton("Start Game", skin);
-        foldBtn  = new TextButton("Fold", skin);
-        callBtn  = new TextButton("Call", skin);
-        raiseBtn = new TextButton("Raise", skin);
-        checkBtn = new TextButton("Check", skin);
+        float worldW = stage.getViewport().getWorldWidth();
+        float worldH = stage.getViewport().getWorldHeight();
+        float uiScale = Math.min(worldW, worldH) / 800f;
+
+        float buttonW = 110f * uiScale;
+        float buttonH =  60f * uiScale;
+        float padX    =  10f * uiScale;
+        float bottomY =  20f * uiScale;
+
+
+        // Создание кнопок
+        startBtn  = new TextButton("Start Game", skin);
+        restartBtn= new TextButton("Restart Game", skin);
+        foldBtn   = new TextButton("Fold", skin);
+        callBtn   = new TextButton("Call", skin);
+        checkBtn  = new TextButton("Check", skin);
+        raiseBtn  = new TextButton("Raise", skin);
         raiseSlider      = new Slider(20, 1000, 10, false, skin);
         raiseAmountLabel = new Label("20$", skin);
-        // позиционирование…
-        startBtn.setPosition(500, 20); startBtn.setSize(300, 60);
-        foldBtn .setPosition(900, 10); foldBtn .setSize(110, 60);
-        callBtn .setPosition(1020,10); callBtn .setSize(110, 60);
-        checkBtn.setPosition(1020,10); checkBtn.setSize(110, 60);
-        raiseBtn.setPosition(1140,10); raiseBtn.setSize(110, 60);
-        raiseSlider.setPosition(1040,80); raiseSlider.setSize(200,60);
-        raiseAmountLabel.setPosition(1040,140);
+
+        // Размеры и позиции
+        float buttonWidth  = 110f * uiScale;
+        float buttonHeight = 60f * uiScale;
+        float paddingX     = 10f * uiScale;
+
+
+        // Позиции кнопок
+        startBtn.setSize(300 * uiScale, buttonHeight);
+        startBtn.setPosition(stage.getWidth()/2f - startBtn.getWidth()/2f, bottomY);
+
+        restartBtn.setSize(100 * uiScale, buttonHeight);
+        restartBtn.setPosition(paddingX, stage.getHeight() - buttonHeight - paddingX);
+
+        foldBtn.setSize(buttonWidth, buttonHeight);
+        foldBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX) * 3, bottomY);
+
+        callBtn.setSize(buttonWidth, buttonHeight);
+        callBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX) * 2, bottomY);
+
+        checkBtn.setSize(buttonWidth, buttonHeight);
+        checkBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX) * 2, bottomY); // одинаково с callBtn
+
+        raiseBtn.setSize(buttonWidth, buttonHeight);
+        raiseBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX), bottomY);
+
+        raiseSlider.setSize(200 * uiScale, 60 * uiScale);
+        raiseSlider.setPosition(stage.getWidth() - raiseSlider.getWidth() - paddingX, bottomY + buttonHeight + paddingX);
+
+        raiseAmountLabel.setFontScale(uiScale);
+        raiseAmountLabel.setPosition(raiseSlider.getX(), raiseSlider.getY() + raiseSlider.getHeight() + paddingX);
         // listeners…
         startBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
                 client.sendGameStart();
                 startBtn.setVisible(false);
+            }
+        });
+        restartBtn.addListener(new ChangeListener() {
+            @Override public void changed(ChangeEvent event, Actor actor) {
+                RestartGameRequest req = new RestartGameRequest();
+                req.senderId = 1; // или client.getMyId(), если он уже определён как 1
+                client.sendRestart(req);
             }
         });
         foldBtn.addListener(new ChangeListener() {
@@ -171,9 +238,10 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 raiseAmountLabel.setText((int)raiseSlider.getValue() + "$");
             }
         });
-
+        // Добавление на сцену
         hideActionUI();
         stage.addActor(startBtn);
+        stage.addActor(restartBtn);
         stage.addActor(foldBtn);
         stage.addActor(callBtn);
         stage.addActor(checkBtn);
@@ -182,8 +250,10 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         stage.addActor(raiseAmountLabel);
     }
 
+
     private void hideActionUI() {
         startBtn.setVisible(false);
+        restartBtn.setVisible(false);
         foldBtn.setVisible(false);
         callBtn.setVisible(false);
         checkBtn.setVisible(false);
@@ -192,38 +262,58 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         raiseAmountLabel.setVisible(false);
     }
     private void setupChat() {
+        float worldW = stage.getViewport().getWorldWidth();
+        float worldH = stage.getViewport().getWorldHeight();
+        float uiScale = Math.min(worldW, worldH) / 800f; // Базовая шкала для адаптации под экран
+
+        // Таблица сообщений чата
         chatMessages = new Table();
         chatMessages.top().left();
-        chatMessages.defaults().pad(5).left().width(280);
+        chatMessages.defaults().pad(1 * uiScale).left().width(380f * uiScale); // Подстраиваем паддинг и ширину под масштаб
 
+        // ScrollPane для прокрутки сообщений
         chatScroll = new ScrollPane(chatMessages, skin);
-        chatScroll.setSize(300, 200);
-        chatScroll.setPosition(10, 40);
-        chatScroll.setScrollingDisabled(true, false);
+        chatScroll.setScrollingDisabled(true, false); // Только вертикальная прокрутка
+        chatScroll.setSize(400f * uiScale, 200f * uiScale);
+        chatScroll.setPosition(10 * uiScale, 50 * uiScale); // Отступы тоже масштабируем
         stage.addActor(chatScroll);
 
+        // Поле ввода текста
         chatInputField = new TextField("", skin);
         chatInputField.setMessageText("Type a message...");
-        chatInputField.setSize(300, 40);
-        chatInputField.setPosition(10, 1);
+        chatInputField.setSize(320f * uiScale, 40f * uiScale);
+        chatInputField.setPosition(10 * uiScale, 10 * uiScale);
         stage.addActor(chatInputField);
 
+        // Кнопка отправки
         sendButton = new TextButton("Send", skin);
-        sendButton.setSize(70, 30);
-        sendButton.setPosition(310,40);
+        sendButton.setSize(80f * uiScale, 40f * uiScale);
+        sendButton.setPosition(chatInputField.getX() + chatInputField.getWidth() + 10 * uiScale, chatInputField.getY());
         sendButton.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
                 String msg = chatInputField.getText().trim();
                 if (!msg.isEmpty()) {
                     client.sendChatMessage(msg);
                     chatInputField.setText("");
+
+                    // Прокрутка в самый низ
+                    chatScroll.layout(); // Убедимся, что ScrollPane обновлён
+                    chatScroll.setScrollPercentY(1f); // Прокрутка вниз
                 }
             }
         });
         stage.addActor(sendButton);
     }
+
     // === Resize / render / dispose ===
-    @Override public void resize(int w,int h){ stage.getViewport().update(w,h,true); }
+    @Override
+    public void resize(int width, int height) {
+        stage.getViewport().update(width, height, true);
+        float worldW = stage.getViewport().getWorldWidth();
+        float worldH = stage.getViewport().getWorldHeight();
+        UIScale.ui = Math.min(worldW, worldH) / 800f;
+    }
     @Override public void render(float delta){
         ScreenUtils.clear(0,0,0,1);
         stage.act(delta);
@@ -243,7 +333,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         this.currentPlayers = nicknames;
         setMyPlayerId(client.getMyId());
         Gdx.app.postRunnable(() -> {
-            if (isHost && nicknames.size() >= 2) startBtn.setVisible(true);
+            if (isHost && nicknames.size() >= 2) startBtn.setVisible(true);restartBtn.setVisible(true);
         });
     }
 
@@ -256,7 +346,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
     @Override
     public void onGameStarted(GameStartedNotification note) {
-        Gdx.app.postRunnable(() -> arrangePlayersOnTable(currentPlayers));
+        Gdx.app.postRunnable(() -> arrangePlayersOnTable(currentPlayers));restartBtn.setVisible(true);
     }
 
 
@@ -268,38 +358,61 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     }
 
     private void arrangePlayersOnTable(List<String> players) {
-        // очищаем
+        // Удаляем старых актёров
         for (PlayerActor pa : playerActorsById.values()) pa.remove();
         playerActorsById.clear();
 
-        float screenW = Gdx.graphics.getWidth();
-        float screenH = Gdx.graphics.getHeight();
+        float worldW = stage.getViewport().getWorldWidth();
+        float worldH = stage.getViewport().getWorldHeight();
+
+        float tableCenterX = worldW * 0.5f; //- worldW * 0.02f; // влево на 2%
+        float tableCenterY = worldH * 0.5f - worldH * 0.08f; // ниже на 8%
+        float radius       = Math.min(worldW, worldH) * 0.3f;
 
         int total   = players.size();
         int myIndex = players.indexOf(client.getNickName());
 
+        // Центр стола: можно сместить вправо/вниз через offset
+        float offsetX = 0.05f * worldW; // на 5% экрана вправо
+        float offsetY = -0.02f * worldH; // на 2% вниз
+
         for (int i = 0; i < total; i++) {
             String nick = players.get((myIndex + i) % total);
-            int id      = client.getIdByNickname(nick);
-
+            int id = client.getIdByNickname(nick);
             boolean amI = (id == myPlayerId);
-            PlayerActor pa = new PlayerActor( amI,
-                id, nick,
+
+            PlayerActor pa = new PlayerActor(amI, id, nick,
                 playerBalances.getOrDefault(nick, 0.0),
                 avatarTexture, skin
             );
-            // В конструкторе он уже вызвал pack() и setSize(...)
 
-            // Считаем позицию по кругу
-            float angle = (float)(-Math.PI/2 + 2*Math.PI*i/total);
-            float x = tableCenterX + radius * (float)Math.cos(angle) - pa.getWidth()/2f;
-            float y = tableCenterY + radius * (float)Math.sin(angle) - pa.getHeight()/2f;
+            // Угол размещения на круге
+            float angle = (float) (-Math.PI / 2 + 2 * Math.PI * i / total); // Начинаем сверху и по кругу
 
-            pa.setPosition(x, y);
+            // Координаты центра игрока
+            float actorCenterX = tableCenterX + radius * (float) Math.cos(angle);
+            float actorCenterY = tableCenterY + radius * (float) Math.sin(angle);
+
+            // Центрируем по X
+            float actorX = actorCenterX - pa.getWidth() / 2f;
+            float actorY = actorCenterY;
+
+            // Смещение по Y, чтобы не вылезали за экран
+            float topCorrection = pa.getHeight() * 0.6f;
+            float bottomCorrection = pa.getHeight() * 0.2f;
+
+            if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
+                actorY -= topCorrection; // если сверху — опустить
+            } else {
+                actorY -= bottomCorrection; // если снизу — слегка подвинуть
+            }
+
+            pa.setPosition(actorX, actorY);
             stage.addActor(pa);
             playerActorsById.put(id, pa);
         }
     }
+
 
     @Override
     public void onPlayerBalanceUpdate(PlayerBalanceUpdate upd) {
@@ -369,6 +482,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
     @Override
     public void onPotUpdate(PotUpdate update) {
+        animateAllBetsToPot();
         updatePot(update.getPotAmount());
     }
 
@@ -421,116 +535,176 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 Gdx.app.error("GameScreen", "EndOfHandPacket содержит null! Прерываем анимацию.");
                 return;
             }
-            // 2) Показываем карты игроков
-            revealOpponentCards(packet.getHandsByPlayerId());
 
-            // 3) Ждём и показываем победителей
-            stage.addAction(Actions.sequence(
+            // 1) Показываем карты оппонентов
+            revealOpponentCards(packet.getHandsByPlayerId());
+            // Тут же показываем всем КомбоТексты!
+            List<Integer> ids   = packet.getWinnerIds();
+            List<String> names  = packet.getCombinationNames();
+            for (int i = 0; i < ids.size(); i++) {
+                PlayerActor p = playerActorsById.get(ids.get(i));
+                if (p != null) showWinningComboText(p, names.get(i));
+            }
+
+
+            // 2) Собираем единую последовательность действий
+            int winnersCount = packet.getWinnerIds().size();
+            float postShowDelay = 2f * winnersCount; // ждать столько же секунд, сколько победителей
+
+            SequenceAction fullSeq = Actions.sequence(
+                // a) первичная задержка, чтобы игроки увидели карты
                 Actions.delay(2.5f),
+
+                // b) скрыть potLabel и запустить последовательную подсветку
                 Actions.run(() -> {
                     potLabel.setVisible(false);
-                    showWinnersAnimation(
+                    showWinnersSequentially(
                         packet.getWinnerIds(),
                         packet.getWinningCards(),
                         packet.getCombinationNames(),
                         packet.getWinningsByPlayerId()
                     );
-                    stage.addAction(Actions.sequence(
-                        Actions.delay(2.5f),
-                        Actions.run(() -> {
-                            clearFloatingActors();
-                            potLabel.setVisible(true);
-                        })
-                    ));
+                }),
+                // c) подождать, пока все подсветки/анимации пройдут
+                Actions.delay(postShowDelay),
+                // d) очистка всех временных элементов и возврат UI
+                Actions.run(() -> {
+                    clearFloatingActors();
+                    potLabel.setVisible(true);
+                    for (PlayerActor playerActor : playerActorsById.values()) {
+                        if (playerActor.isLocalPlayer()) {
+                            // отправляем подтверждение
+                            System.out.println("GameScreen"+ "Отправляю ClientReadyForNextRound...");
+                            client.sendReadyForNextRound(playerActor.getPlayerId(), true);
+                        }
+                    }
                 })
-            ));
+            );
+            // 3) Запускаем на stage
+            stage.addAction(fullSeq);
         });
     }
+
+    @Override
+    public void onGameRestart() {
+    }
+
+
 
     private void revealOpponentCards(Map<Integer, List<Card>> handsByPlayerId) {
         for (Map.Entry<Integer, List<Card>> entry : handsByPlayerId.entrySet()) {
             int pid = entry.getKey();
-            // Пропускаем себя — свои карты не рисуем здесь
-            if (pid == currentPlayerId) {
-                continue;
-            }
-
-            List<Card> hand = entry.getValue();
+            if (pid == currentPlayerId) continue;
             PlayerActor pa = playerActorsById.get(pid);
             if (pa == null) continue;
 
-            float startX = pa.getX() + pa.getWidth() / 2f - hand.size() * CARD_GAP / 2f;
-            float y      = pa.getY() - CARD_HEIGHT - 20;
+            List<Card> hand = entry.getValue();
+            List<CardActor> backs = pa.getBackActors();
+            // Может оказаться, что рубашек больше/меньше — тогда подстраиваем:
+            int n = Math.min(backs.size(), hand.size());
 
-            List<CardActor> actors = new ArrayList<>();
-            for (int i = 0; i < hand.size(); i++) {
-                CardActor ca = new CardActor(hand.get(i));
-                ca.setSize(CARD_WIDTH, CARD_HEIGHT);
-                ca.setPosition(startX + i * CARD_GAP, y);
-                ca.showBack();
-                stage.addActor(ca);
-                actors.add(ca);
+            for (int i = 0; i < n; i++) {
+                CardActor back = backs.get(i);
+                Card face = hand.get(i);
 
-                final int index = i;
-                ca.addAction(Actions.sequence(
-                    Actions.delay(0.2f * index),
+                // Последовательность: поворот рубашки, подмена текстуры, разворот лицом
+                back.addAction(Actions.sequence(
                     Actions.rotateTo(90, 0.2f),
-                    Actions.run(() -> ca.showFront()),
+                    Actions.run(() -> {
+                        back.setFaceDown(false);      // переключиться на front
+                        back.setCard(face);           // обновить текстуру лицевой стороны
+                        back.setRotation(90);         // сохраняем угол, чтобы сразу развернуть
+                    }),
                     Actions.rotateTo(0, 0.1f)
                 ));
             }
-            opponentCardActors.put(pid, actors);
         }
     }
 
-    public void showWinnersAnimation(
+
+    private void resetAllHighlights() {
+        for (CardActor ca : tableCardActors) {
+            ca.setHighlight(false);
+        }
+        for (List<CardActor> opp : opponentCardActors.values()) {
+            for (CardActor ca : opp) ca.setHighlight(false);
+        }
+        for (PlayerActor pa : playerActorsById.values()) {
+            for (CardActor ca : pa.getCardActors()) ca.setHighlight(false);
+        }
+    }
+    private void showWinnersSequentially(
         List<Integer> winnerIds,
         List<List<Card>> winningCardsByWinner,
         List<String> combinationNames,
         Map<Integer, Double> winningsByPlayerId
     ) {
-        if (winnerIds.isEmpty()) return;
+        resetAllHighlights();
+        clearTransientActors();
+
+        SequenceAction seq = new SequenceAction();
 
         for (int i = 0; i < winnerIds.size(); i++) {
-            int id = winnerIds.get(i);
-            List<Card> combo = winningCardsByWinner.get(i);
-            String comboName = combinationNames.get(i);
-            double wonAmount = winningsByPlayerId.getOrDefault(id, 0.0);
+            int pid       = winnerIds.get(i);
+            double amount = winningsByPlayerId.getOrDefault(pid, 0.0);
+            if (amount <= 0) continue;  // пропускаем
 
-            // Подсветить выигрышные карты
-            highlightWinningCardsForPlayer(id, combo);
+            List<Card> combo   = winningCardsByWinner.get(i);
+            String comboName   = combinationNames.get(i);
 
-            // Анимация фишек/банка к победителю
-            animatePotToWinner(id, wonAmount);
-
-            // Текст с названием комбинации и суммой
-            PlayerActor p = playerActorsById.get(id);
-            if (p != null) {
-                showWinningComboText(p, comboName);
-            }
+            // подсветка
+            seq.addAction(Actions.run(() -> highlightWinningCardsForPlayer(pid, combo)));
+            // анимация пота
+            seq.addAction(Actions.run(() -> animatePotToWinner(pid, amount)));
+            // текст
+            seq.addAction(Actions.run(() -> {
+                PlayerActor p = playerActorsById.get(pid);
+                if (p != null) showWinningComboText(p, comboName);
+            }));
+            // пауза 2 секунды
+            seq.addAction(Actions.delay(2f));
+            // сброс
+            seq.addAction(Actions.run(this::resetAllHighlights));
         }
+
+        // финальный сброс
+        seq.addAction(Actions.run(() -> {
+            clearTransientActors();
+            potLabel.setVisible(true);
+        }));
+
+        stage.addAction(seq);
     }
+
+
 
     private void highlightWinningCardsForPlayer(int playerId, List<Card> winningCards) {
-        Color glow = new Color(1, 1, 0, 0.6f);
+        Set<Card> winningSet = new HashSet<>(winningCards);
 
-        // Подсветка общих карт
+        // Подсветка борда
         for (CardActor ca : tableCardActors) {
-            if (winningCards.contains(ca.getCard())) {
-                ca.addAction(Actions.sequence(
-                    Actions.color(glow, 0.3f),
-                    Actions.delay(1f),
-                    Actions.color(Color.WHITE, 0.3f)
-                ));
-            }
+            ca.setHighlight(winningSet.contains(ca.getCard()));
         }
 
-        // Подсветка карт игрока
-        PlayerActor p = playerActorsById.get(playerId);
-        if (p != null) {
-            p.highlightWinningCards(winningCards);
+        PlayerActor pa = playerActorsById.get(playerId);
+        if (pa == null) return;
+
+        List<CardActor> actors;
+        if (playerId == currentPlayerId) {
+            // свои карты
+            actors = pa.getCardActors();
+        } else {
+            // «ревеленные» карты оппонента
+            actors = pa.getBackActors();
+        }
+
+        for (CardActor ca : actors) {
+            ca.setHighlight(winningSet.contains(ca.getCard()));
         }
     }
+
+
+
 
     private void animatePotToWinner(int winnerId, double potAmount) {
         if (potAmount == 0) return;
@@ -562,9 +736,9 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         );
         Label combo = new Label(text, skin);
         combo.setColor(Color.YELLOW);
-        combo.setFontScale(1.2f);
+        combo.setFontScale(1.4f);
         combo.pack();
-        float x = player.getX() + player.getWidth() / 2f - combo.getWidth() / 2f;
+        float x = player.getX() + player.getWidth() / 2f - combo.getWidth();
         float y = player.getY() + player.getHeight() + 10;
         combo.setPosition(x, y);
         stage.addActor(combo);
@@ -603,27 +777,55 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         tableCardActors.forEach(Actor::remove);
         tableCardActors.clear();
     }
+    private void clearTransientActors() {
+        for (Actor a : transientActors) {
+            a.remove();
+        }
+        transientActors.clear();
+    }
     private void showTableCards(List<Card> tableCards) {
         tableCardActors.forEach(Actor::remove);
         tableCardActors.clear();
-        float spacing=10, totalW=tableCards.size()*CARD_WIDTH+(tableCards.size()-1)*spacing;
-        float startX=tableCenterX-totalW/2f, y=tableCenterY-CARD_HEIGHT/2f+30;
-        for (int i=0;i<tableCards.size();i++){
+
+        float totalCards = tableCards.size();
+        float totalWidth = totalCards * cardWidth + (totalCards - 1) * CARD_GAP * UIScale.ui;
+        float startX     = tableCenterX - totalWidth / 2f;
+        float yOffset    = cardHeight * 0.3f;
+        float y          = tableCenterY - cardHeight/2f + yOffset;
+
+        for (int i = 0; i < tableCards.size(); i++) {
             CardActor ca = new CardActor(tableCards.get(i));
-            ca.setSize(CARD_WIDTH,CARD_HEIGHT);
-            ca.setPosition(startX + i*(CARD_WIDTH+spacing), y);
+            ca.setSize(cardWidth, cardHeight);
+            ca.setPosition(startX + i * (cardWidth + CARD_GAP * UIScale.ui), y);
+            ca.getColor().a = 0f;
+            ca.addAction(Actions.fadeIn(0.5f));
             stage.addActor(ca);
             tableCardActors.add(ca);
         }
     }
-    private void addChatMessage(String message) {
-        Label.LabelStyle style = new Label.LabelStyle(skin.getFont("font"), Color.WHITE);
-        Label label = new Label(message, style);
+
+    private void addChatMessage(String text) {
+        Label label;
+
+        // Стилизация сообщений: системные — серые, обычные — белые
+        if (text.startsWith("sys:")) {
+            label = new Label(text.substring(4), skin); // убираем "sys:" префикс
+            label.setColor(Color.DARK_GRAY);
+        } else {
+            label = new Label(text, skin);
+            label.setColor(Color.WHITE);
+        }
+
         label.setWrap(true);
-        label.setAlignment(Align.left);
-        label.setWidth(280); // важно для переноса
-        chatMessages.add(label).left().width(280).padBottom(5).row();
+        chatMessages.add(label).expandX().fillX();
+        chatMessages.row();
+
+        // Обновляем layout и скроллим вниз
+        chatMessages.pack();
+        chatScroll.layout();
+        chatScroll.setScrollPercentY(1f); // Прокрутка в самый низ
     }
+
 
     public void updatePot(double potValue) {
         Gdx.app.postRunnable(() -> {
@@ -632,5 +834,26 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             }
         });
     }
+    public void animateAllBetsToPot() {
+        Vector2 potPos = new Vector2(potLabel.getX(), potLabel.getY());
+
+        for (PlayerActor player : playerActorsById.values()) {
+            double amount = player.getCurrentBetAmount();
+            if (amount > 0) {
+                Label flyingBet = player.createFlyingBetLabel(amount);
+                stage.addActor(flyingBet);
+
+                flyingBet.addAction(Actions.sequence(
+                    Actions.moveTo(potPos.x, potPos.y, 0.6f, Interpolation.smooth),
+                    Actions.fadeOut(0.2f),
+                    Actions.run(flyingBet::remove)
+                ));
+
+                player.clearBet();
+            }
+        }
+    }
+
+
 }
 

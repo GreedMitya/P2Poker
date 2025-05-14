@@ -3,6 +3,7 @@ package Poker.Game.Client;
 import Poker.Game.ClientListener;
 import Poker.Game.PacketsClasses.*;
 
+import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
@@ -98,6 +99,7 @@ public class PokerClient {
                 } else if (object instanceof BlindsNotification) {
                     listener.onBlinds((BlindsNotification) object);
                 } else if (object instanceof ActionRequest) {
+                    System.out.println("ClientListener"+ "Получен ActionRequest: " + object);
                     listener.onActionRequest((ActionRequest) object);
                 } else if (object instanceof PlayerBalanceUpdate) {
                     listener.onPlayerBalanceUpdate((PlayerBalanceUpdate) object);
@@ -114,14 +116,20 @@ public class PokerClient {
                     listener.onPlayerFold((FoldNotification) object);
                 }else if(object instanceof EndOfHandPacket){
                     listener.onEndOfHandPacket((EndOfHandPacket) object);
+                }else if (object instanceof RestartGameNotification) {
+                    listener.onGameRestart();
                 }
+
             }
 
-            @Override
             public void disconnected(Connection connection) {
-                if (listener != null) {
-                    listener.onDisconnected();
-                }
+                Logger.client( "Disconnected from server, shutting down…");
+                // Сначала закрываем клиент
+                client.stop();
+                // Даем немного времени, чтобы все внутренние потоки клиента завершились
+                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+                // А теперь выходим из JVM (вызовет хук на сервере, если запущен в том же процессе)
+                System.exit(0);
             }
         });
 
@@ -169,6 +177,10 @@ public class PokerClient {
     public void sendGameStart() {
         client.sendTCP(new GameStartRequest());
     }
+    public void sendReadyForNextRound(int playerId, boolean isReady) {
+        ClientReadyForNextRound packet = new ClientReadyForNextRound(playerId, isReady);
+        client.sendTCP(packet);
+    }
 
     public void setHost(boolean host) {
         this.host = host;
@@ -192,5 +204,9 @@ public class PokerClient {
 
     public int getMyId() {
         return clientId;
+    }
+
+    public void sendRestart(RestartGameRequest req) {
+        client.sendTCP(req);
     }
 }

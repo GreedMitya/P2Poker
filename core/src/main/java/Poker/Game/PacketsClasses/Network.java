@@ -21,6 +21,9 @@ public class Network {
         kryo.register(ClearBetsNotification.class);
         kryo.register(TableCardsInfo.class);
         kryo.register(ChatMessage.class);
+        kryo.register(RestartGameRequest.class);
+        kryo.register(RestartGameNotification.class);
+        kryo.register(ClientReadyForNextRound.class);
         kryo.register(PlayerAction.class);
         kryo.register(LinkedList.class);
         kryo.register(Logger.class);

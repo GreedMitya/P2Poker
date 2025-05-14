@@ -4,6 +4,7 @@ import Poker.Game.PacketsClasses.EndOfHandPacket;
 import Poker.Game.PacketsClasses.GameStats;
 import Poker.Game.PacketsClasses.Logger;
 import Poker.Game.Server.PokerServer;
+import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryonet.Server;
 
 import java.util.*;
@@ -11,7 +12,7 @@ import java.util.*;
 // Main Game Manager Class
 public class PokerGame {
     private PokerServer pokerServer;
-
+    private final Set<Integer> readyPlayerIds = new HashSet<>();
     private Server server;
     public Deck deck;
     public Table table;
@@ -37,21 +38,31 @@ public class PokerGame {
     }
 
     public void startGame() {
-        while (playerManager.getPlayers().size() > 1) {
-            roundCounter++;
-            Logger.Game("\nStarting Round: " + roundCounter);
-            deck.shuffle();
-            Logger.Game("Active players: " + playerManager.getActivePlayers().size());
-            GameStats stats = new GameStats(roundCounter,playerManager.getActivePlayers().size());
-            server.sendToAllTCP(stats);
-            playerManager.prepareForRound(deck);
-            bettingManager.reset();
-            playRound(); //- КЛЮЧ К СТАРТУ
-        }
-        System.out.println("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
-        pokerServer.sendChatMessage("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
-        System.exit(0);
+        roundCounter = 0;
+        startNextRound(); // только один вызов!
+    }
 
+    public void startNextRound() {
+        // Условие выхода (если остался 1 игрок)
+        if (playerManager.getActivePlayers().size() <= 1) {
+            Logger.Game("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
+            pokerServer.sendChatMessage("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
+            System.exit(0);
+            return;
+        }
+
+        roundCounter++;
+        Logger.Game("\nStarting Round: " + roundCounter);
+        deck.shuffle();
+        Logger.Game("Active players: " + playerManager.getActivePlayers().size());
+
+        GameStats stats = new GameStats(roundCounter, playerManager.getActivePlayers().size());
+        server.sendToAllTCP(stats);
+
+        playerManager.prepareForRound(deck);
+        bettingManager.reset();
+
+        playRound(); // ключ к запуску!
     }
     public void setServer(Server server) {
         this.server = server;
@@ -75,6 +86,7 @@ public class PokerGame {
 
         table.dealFlop(deck);
         table.showBoard();
+        pokerServer.sendChatMessage("Flop: " + table.board.toString());
         bettingManager.startBettingRound(BettingManager.BettingPhase.FLOP);
         this.bettingPhase = BettingManager.BettingPhase.FLOP;
         if (isRoundComplete()) {
@@ -86,6 +98,7 @@ public class PokerGame {
 
         table.dealTurn(deck);
         table.showBoard();
+        pokerServer.sendChatMessage("Turn: " + table.board.toString());
         bettingManager.startBettingRound(BettingManager.BettingPhase.TURN);
         this.bettingPhase = BettingManager.BettingPhase.TURN;
         if (isRoundComplete()) {
@@ -97,15 +110,11 @@ public class PokerGame {
 
         table.dealRiver(deck);
         table.showBoard();
+        pokerServer.sendChatMessage("River: " + table.board.toString());
         bettingManager.startBettingRound(BettingManager.BettingPhase.RIVER);
         this.bettingPhase = BettingManager.BettingPhase.RIVER;
 
         determineWinner();
-        try {
-            Thread.sleep(5500);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
         resetBets();
         endRound();
     }
@@ -175,7 +184,6 @@ public class PokerGame {
     }
 
 
-    // в классе PokerGame
     private void sendEndOfHandPacket(
         List<Player> winners,
         double totalPot,
@@ -193,8 +201,17 @@ public class PokerGame {
         List<String> combinationNamesList = new ArrayList<>();
 
         for (Player winner : winners) {
+            List<Card> combo = winner.getCombination();
+
+            // Логируем, чтобы убедиться
+            Logger.server("Combo for player " + winner.getName() + ": " + combo);
+            if (combo.size() != 5) {
+                Logger.server("❌ ВНИМАНИЕ: Комбинация содержит не 5 карт! combo.size() = " + combo.size());
+            }
+
+            // Добавляем только один раз
             winnerIds.add(winner.getConnectionId());
-            winningCardsList.add(winner.getCombination());
+            winningCardsList.add(combo);
             combinationNamesList.add(winner.getNameofCombination());
         }
 
@@ -205,11 +222,12 @@ public class PokerGame {
         packet.setWinningCards(winningCardsList);
         packet.setCombinationNames(combinationNamesList);
         packet.setAmountWon(totalPot);
-        packet.setWinningsByPlayerId(winningsByPlayerId);  // <—
+        packet.setWinningsByPlayerId(winningsByPlayerId);
 
         // 4) Шлём всем клиентам
         server.sendToAllTCP(packet);
     }
+
 
 
     /**
