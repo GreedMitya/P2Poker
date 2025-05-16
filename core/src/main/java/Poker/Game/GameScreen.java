@@ -89,6 +89,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         avatarTexture = new Texture(Gdx.files.internal("sgx/raw/defaulrAvatar.png"));
         FitViewport viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT);
         stage = new Stage(viewport);
+        Gdx.input.setInputProcessor(stage);
 
 
         float worldW = viewport.getWorldWidth();
@@ -209,25 +210,28 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         });
         foldBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
+                System.out.println("Fold button clicked!");
                 client.sendFold(currentPlayerId);
                 hideActionUI();
             }
         });
         callBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
+                System.out.println("Call button clicked!" + " sending call action from: " + currentPlayerId);
                 client.sendCall(currentPlayerId);
-
                 hideActionUI();
             }
         });
         checkBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
+                System.out.println("Check button clicked!");
                 client.sendCheck(currentPlayerId);
                 hideActionUI();
             }
         });
         raiseBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
+                System.out.println("Raise button clicked!");
                 client.sendRaise(currentPlayerId, (int)raiseSlider.getValue());
                 raiseSlider.setValue(20);
                 hideActionUI();
@@ -434,6 +438,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void onBlinds(BlindsNotification note) {
         Gdx.app.postRunnable(() -> {
             addChatMessage(note.getSmallBlind());
+            potLabel.setVisible(true);
             for (PlayerActor playerActor : playerActorsById.values()) {
                 if (!playerActor.isLocalPlayer()) {
                     playerActor.showCardBacks();
@@ -547,13 +552,13 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             }
 
 
-            // 2) Собираем единую последовательность действий
+            // 2) Собираем единую последовательность действийv
             int winnersCount = packet.getWinnerIds().size();
-            float postShowDelay = 2f * winnersCount; // ждать столько же секунд, сколько победителей
+            float postShowDelay = 1f * winnersCount; // ждать столько же секунд, сколько победителей
 
             SequenceAction fullSeq = Actions.sequence(
                 // a) первичная задержка, чтобы игроки увидели карты
-                Actions.delay(2.5f),
+                Actions.delay(2f),
 
                 // b) скрыть potLabel и запустить последовательную подсветку
                 Actions.run(() -> {
@@ -570,7 +575,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 // d) очистка всех временных элементов и возврат UI
                 Actions.run(() -> {
                     clearFloatingActors();
-                    potLabel.setVisible(true);
+                    //potLabel.setVisible(true); // Хочу чтобы он появлялся только на начале следующего раунда
                     for (PlayerActor playerActor : playerActorsById.values()) {
                         if (playerActor.isLocalPlayer()) {
                             // отправляем подтверждение
@@ -607,16 +612,18 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 CardActor back = backs.get(i);
                 Card face = hand.get(i);
 
-                // Последовательность: поворот рубашки, подмена текстуры, разворот лицом
                 back.addAction(Actions.sequence(
-                    Actions.rotateTo(90, 0.2f),
+                    // 1) Сжимаем по горизонтали до 0 за 0.2 с (имитация правой половины переворота)
+                    Actions.scaleTo(0f, 1f, 0.2f),
+                    // 2) Меняем сторону карты
                     Actions.run(() -> {
-                        back.setFaceDown(false);      // переключиться на front
-                        back.setCard(face);           // обновить текстуру лицевой стороны
-                        back.setRotation(90);         // сохраняем угол, чтобы сразу развернуть
+                        back.setFaceDown(false);
+                        back.setCard(face);
                     }),
-                    Actions.rotateTo(0, 0.1f)
+                    // 3) Расширяем назад до полного размера за 0.2 с (левая половина переворота)
+                    Actions.scaleTo(1f, 1f, 0.3f)
                 ));
+
             }
         }
     }
@@ -662,7 +669,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 if (p != null) showWinningComboText(p, comboName);
             }));
             // пауза 2 секунды
-            seq.addAction(Actions.delay(2f));
+            seq.addAction(Actions.delay(2.5f));
             // сброс
             seq.addAction(Actions.run(this::resetAllHighlights));
         }
@@ -670,7 +677,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         // финальный сброс
         seq.addAction(Actions.run(() -> {
             clearTransientActors();
-            potLabel.setVisible(true);
+            // potLabel.setVisible(true); // Хочу чтобы появлялся аж в начале раунда!
         }));
 
         stage.addAction(seq);
@@ -839,18 +846,24 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
         for (PlayerActor player : playerActorsById.values()) {
             double amount = player.getCurrentBetAmount();
-            if (amount > 0) {
-                Label flyingBet = player.createFlyingBetLabel(amount);
-                stage.addActor(flyingBet);
+            if (amount <= 0) continue;
 
-                flyingBet.addAction(Actions.sequence(
-                    Actions.moveTo(potPos.x, potPos.y, 0.6f, Interpolation.smooth),
-                    Actions.fadeOut(0.2f),
-                    Actions.run(flyingBet::remove)
-                ));
+            // Создаём метку ДО очистки, сразу сохраняем её
+            Label flyingBet = player.createFlyingBetLabel(amount);
+            stage.addActor(flyingBet);
 
-                player.clearBet();
-            }
+            flyingBet.addAction(Actions.sequence(
+                // 1) Полёт к банку
+                Actions.moveTo(potPos.x, potPos.y, 0.3f, Interpolation.smooth),
+                // 2) Затухание
+                Actions.fadeOut(0.2f),
+                // 3) Удаление лейбла
+                Actions.run(() -> {
+                    flyingBet.remove();
+                    // И только теперь очищаем у игрока текущую визуальную ставку
+                    player.clearBet();
+                })
+            ));
         }
     }
 

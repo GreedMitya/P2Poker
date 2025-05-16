@@ -2,7 +2,6 @@ package Poker.Game.Server;
 
 import Poker.Game.PacketsClasses.*;
 import Poker.Game.core.Player;
-import Poker.Game.core.PokerGame;
 import Poker.Game.core.StartGame;
 import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryonet.Connection;
@@ -10,7 +9,6 @@ import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,12 +55,13 @@ public class PokerServer {
                     // Остановим сервер: закроем сокеты и потоки
                     server.stop();
                     // Если хотим — завершаем программу целиком
-                    //System.exit(0);
+                    System.exit(0);
                 }
             }
 
             @Override
             public void received(Connection conn, Object obj) {
+                Logger.server("🔥 RAW PACKET: class=" + obj.getClass().getName() + " toString=" + obj.toString());
                 Logger.server("⧗ Received packet of type: " + obj.getClass().getName());
 
 
@@ -76,7 +75,7 @@ public class PokerServer {
 
                     server.sendToAllTCP(new PlayerJoinedNotification(req.nickname,conn.getID()));
                     server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
-
+                    playerReadyStatus.put(conn.getID(), false);
 
                 } else if (obj instanceof ActionResponse) {
                     ActionResponse resp = (ActionResponse) obj;
@@ -110,6 +109,7 @@ public class PokerServer {
                     ChatMessage mess = (ChatMessage) obj;
                     server.sendToAllTCP(mess);
                 }else if (obj instanceof ClientReadyForNextRound) {
+                    Logger.server("📥 [RESP] Client ready packet from playerId=" + ((ClientReadyForNextRound) obj).getPlayerId());
                     handleClientReadyForNextRound((ClientReadyForNextRound) obj);
                 } else if (obj instanceof RestartGameRequest) {
                     RestartGameRequest req = (RestartGameRequest) obj;
@@ -208,11 +208,21 @@ public class PokerServer {
         boolean isReady = packet.isReady();
         playerReadyStatus.put(playerId, isReady);
 
-        // Проверяем, все ли игроки готовы
         if (areAllPlayersReady()) {
-            startNextRound();
+            Logger.server("Все игроки подтвердили готовность – через 1 секунда стартуем новый раунд");
+            // Сразу обнуляем, чтобы дополнительная обработка не запустила ещё один раунд
+            for (Integer id : playerReadyStatus.keySet()) {
+                playerReadyStatus.put(id, false);
+            }
+            // Планируем старт
+            scheduler.schedule(() -> {
+                Logger.server("⏱ 1 секунда истекла – начинаем новый раунд");
+                startNextRound();
+            }, 1, TimeUnit.SECONDS);
         }
     }
+
+
     private boolean areAllPlayersReady() {
         for (Boolean isReady : playerReadyStatus.values()) {
             if (!isReady) {
@@ -224,6 +234,8 @@ public class PokerServer {
     private void startNextRound() {
         // Логика для начала нового раунда
         System.out.println("Все игроки готовы. Начинаем новый раунд!");
+        startGame.getGame().resetBets();
+        startGame.getGame().endRound();
         startGame.getGame().startNextRound();
     }
 }

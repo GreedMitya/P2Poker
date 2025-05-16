@@ -200,7 +200,7 @@ public class PlayerActor extends WidgetGroup {
     public Label createFlyingBetLabel(double amount) {
         Label.LabelStyle betStyle = new Label.LabelStyle(skin.getFont("font"), Color.WHITE);
         betStyle.background = skin.newDrawable("white", Color.DARK_GRAY);
-        Label flying = new Label((int) amount + "$", betStyle);
+        Label flying = new Label( amount + "$", betStyle);
         flying.setFontScale(1.2f);
         flying.setColor(Color.GOLD);
 

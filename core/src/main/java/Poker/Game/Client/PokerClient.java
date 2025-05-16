@@ -58,11 +58,11 @@ public class PokerClient {
      */
     public void start(String hostIP, String nickname) throws IOException {
         client = new Client();
-        client.start();
-
         // Регистрация всех пакетов
         Kryo kryo = client.getKryo();
         Network.register(kryo);
+        client.start();
+
 
         // Во всех потоках KryoNet — ловим uncaught exceptions
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
@@ -145,6 +145,7 @@ public class PokerClient {
     // === Методы для UI / контроллера, вызываемые при клике на кнопки ===
 
     public void sendCheck(int playerId) {
+        System.out.println("Отправляю действие: " + "Check" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("check", 0, 0, 0);
@@ -152,6 +153,7 @@ public class PokerClient {
     }
 
     public void sendFold(int playerId) {
+        System.out.println("Отправляю действие: " + "Fold" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("fold", 0, 0, 0);
@@ -159,13 +161,18 @@ public class PokerClient {
     }
 
     public void sendCall(int playerId) {
+        System.out.println("Отправляю действие: " + "Call" + " от игрока: " + playerId);
+
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("call", 0, 0, 0);
         client.sendTCP(resp);
+        System.out.println("client.isConnected() = " + client.isConnected());
+        System.out.println("client.getKryo() = " + client.getKryo());
     }
 
     public void sendRaise(int playerId, float amount) {
+        System.out.println("Отправляю действие: " + "Raise" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("raise", amount, 0, 0);

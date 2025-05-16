@@ -115,8 +115,6 @@ public class PokerGame {
         this.bettingPhase = BettingManager.BettingPhase.RIVER;
 
         determineWinner();
-        resetBets();
-        endRound();
     }
 
     private boolean isRoundComplete() {
@@ -281,7 +279,7 @@ public class PokerGame {
     }
 
 
-    private void endRound() {
+    public void endRound() {
         System.out.println("Ending round...");
         pokerServer.sendChatMessage("Ending round...");
         table.clearBoard(deck);
