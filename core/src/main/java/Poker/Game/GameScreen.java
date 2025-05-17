@@ -21,6 +21,9 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.Timer;
+import com.badlogic.gdx.utils.Timer.Task;
+
 
 import java.util.*;
 import java.util.List;
@@ -64,6 +67,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private boolean amI;
     private Action[] currentActions;
     // === Транзитные актёры (летящие поты, метки комбинаций) ===
+    private Map<Integer, Double> betMap = new HashMap<>();
     private final List<Actor> transientActors = new ArrayList<>();
     public GameScreen(PokerApp app, PokerClient client, boolean isHost) {
         this.app    = app;
@@ -350,7 +354,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
     @Override
     public void onGameStarted(GameStartedNotification note) {
-        Gdx.app.postRunnable(() -> arrangePlayersOnTable(currentPlayers));restartBtn.setVisible(true);
+        Gdx.app.postRunnable(() -> addChatMessage("Game Started!"));restartBtn.setVisible(true);
     }
 
 
@@ -361,27 +365,29 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         );
     }
 
-    private void arrangePlayersOnTable(List<String> players) {
-        // Удаляем старых актёров
+    private void arrangePlayersOnTable(List<String> logicalOrder) {
+        // Удаляем старые
         for (PlayerActor pa : playerActorsById.values()) pa.remove();
         playerActorsById.clear();
 
         float worldW = stage.getViewport().getWorldWidth();
         float worldH = stage.getViewport().getWorldHeight();
 
-        float tableCenterX = worldW * 0.5f; //- worldW * 0.02f; // влево на 2%
-        float tableCenterY = worldH * 0.5f - worldH * 0.08f; // ниже на 8%
+        float tableCenterX = worldW * 0.5f;
+        float tableCenterY = worldH * 0.5f - worldH * 0.08f;
         float radius       = Math.min(worldW, worldH) * 0.3f;
 
-        int total   = players.size();
-        int myIndex = players.indexOf(client.getNickName());
+        int total = logicalOrder.size();
+        int myIndex = logicalOrder.indexOf(client.getNickName());
 
-        // Центр стола: можно сместить вправо/вниз через offset
-        float offsetX = 0.05f * worldW; // на 5% экрана вправо
-        float offsetY = -0.02f * worldH; // на 2% вниз
+        // Сдвигаем логический список так, чтобы "я" был первым
+        List<String> visualOrder = new ArrayList<>();
+        for (int i = 0; i < total; i++) {
+            visualOrder.add(logicalOrder.get((myIndex + i) % total));
+        }
 
         for (int i = 0; i < total; i++) {
-            String nick = players.get((myIndex + i) % total);
+            String nick = visualOrder.get(i);
             int id = client.getIdByNickname(nick);
             boolean amI = (id == myPlayerId);
 
@@ -390,25 +396,22 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 avatarTexture, skin
             );
 
-            // Угол размещения на круге
-            float angle = (float) (-Math.PI / 2 + 2 * Math.PI * i / total); // Начинаем сверху и по кругу
+            // По кругу, начиная с "я" внизу (угол -PI/2)
+            float angle = (float) (-Math.PI / 2 + 2 * Math.PI * i / total);
 
-            // Координаты центра игрока
             float actorCenterX = tableCenterX + radius * (float) Math.cos(angle);
             float actorCenterY = tableCenterY + radius * (float) Math.sin(angle);
 
-            // Центрируем по X
             float actorX = actorCenterX - pa.getWidth() / 2f;
             float actorY = actorCenterY;
 
-            // Смещение по Y, чтобы не вылезали за экран
             float topCorrection = pa.getHeight() * 0.6f;
             float bottomCorrection = pa.getHeight() * 0.2f;
 
             if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
-                actorY -= topCorrection; // если сверху — опустить
+                actorY -= topCorrection;
             } else {
-                actorY -= bottomCorrection; // если снизу — слегка подвинуть
+                actorY -= bottomCorrection;
             }
 
             pa.setPosition(actorX, actorY);
@@ -416,6 +419,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             playerActorsById.put(id, pa);
         }
     }
+
 
 
     @Override
@@ -430,7 +434,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void onPlayerBetUpdate(PlayerBetUpdate upd) {
         Gdx.app.postRunnable(() -> {
             PlayerActor pa = playerActorsById.get(upd.playerId);
-            if (pa != null) pa.showBet(upd.amount);
+            pa.showBet(upd.amount);
         });
     }
 
@@ -447,13 +451,20 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         });
     }
 
+    private Timer.Task hideButtonsTask; // поле класса
+
     @Override
     public void onActionRequest(ActionRequest req) {
         System.out.println("onActionRequest called for player: " + req.playerId);
         this.currentPlayerId  = req.playerId;
         this.currentActions   = req.availableActions;
 
-        // Показываем кнопки
+        // Если до этого был запущен таймер — отменяем его
+        if (hideButtonsTask != null) {
+            hideButtonsTask.cancel();
+            hideButtonsTask = null;
+        }
+
         Gdx.app.postRunnable(() -> {
             Set<String> availableNames = new HashSet<>();
             for (Action action : currentActions) {
@@ -469,8 +480,25 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
             raiseSlider.setVisible(availableNames.contains("raise"));
             raiseAmountLabel.setVisible(availableNames.contains("raise"));
+
+            // Запускаем таймер на 30 секунд, чтобы скрыть кнопки
+            hideButtonsTask = Timer.schedule(new Timer.Task() {
+                @Override
+                public void run() {
+                    Gdx.app.postRunnable(() -> {
+                        checkBtn.setVisible(false);
+                        callBtn.setVisible(false);
+                        raiseBtn.setVisible(false);
+                        foldBtn.setVisible(false);
+                        raiseSlider.setVisible(false);
+                        raiseAmountLabel.setVisible(false);
+                    });
+                    hideButtonsTask = null;
+                }
+            }, 30); // 30 секунд
         });
     }
+
 
 
     @Override
@@ -487,7 +515,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
     @Override
     public void onPotUpdate(PotUpdate update) {
-        animateAllBetsToPot();
+        animateAllBetsToPot(betMap);
         updatePot(update.getPotAmount());
     }
 
@@ -594,6 +622,18 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void onGameRestart() {
     }
 
+    @Override
+    public void onPlayerOrderPacket(PlayerOrderPacket object) {
+        currentPlayers = object.logicalOrder;
+        Gdx.app.postRunnable(() -> {
+            arrangePlayersOnTable(currentPlayers);
+        });
+    }
+
+    @Override
+    public void onBetUpdatePack(BetUpdatePack object) {
+        betMap = object.getBets();
+    }
 
 
     private void revealOpponentCards(Map<Integer, List<Card>> handsByPlayerId) {
@@ -841,31 +881,30 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             }
         });
     }
-    public void animateAllBetsToPot() {
+    public void animateAllBetsToPot(Map<Integer, Double> betMap) {
         Vector2 potPos = new Vector2(potLabel.getX(), potLabel.getY());
 
-        for (PlayerActor player : playerActorsById.values()) {
-            double amount = player.getCurrentBetAmount();
+        for (Map.Entry<Integer, Double> entry : betMap.entrySet()) {
+            PlayerActor player = playerActorsById.get(entry.getKey());
+            if (player == null) continue;
+
+            double amount = entry.getValue();
             if (amount <= 0) continue;
 
-            // Создаём метку ДО очистки, сразу сохраняем её
             Label flyingBet = player.createFlyingBetLabel(amount);
             stage.addActor(flyingBet);
 
             flyingBet.addAction(Actions.sequence(
-                // 1) Полёт к банку
-                Actions.moveTo(potPos.x, potPos.y, 0.3f, Interpolation.smooth),
-                // 2) Затухание
+                Actions.moveTo(potPos.x, potPos.y, 0.5f, Interpolation.smooth),
                 Actions.fadeOut(0.2f),
-                // 3) Удаление лейбла
                 Actions.run(() -> {
                     flyingBet.remove();
-                    // И только теперь очищаем у игрока текущую визуальную ставку
                     player.clearBet();
                 })
             ));
         }
     }
+
 
 
 }

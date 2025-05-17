@@ -21,4 +21,6 @@ public interface ClientListener {
     void onPlayerFold(FoldNotification notif);
     void onEndOfHandPacket(EndOfHandPacket packet);
     void onGameRestart();
+    void onPlayerOrderPacket(PlayerOrderPacket object);
+    void onBetUpdatePack(BetUpdatePack object);
 }

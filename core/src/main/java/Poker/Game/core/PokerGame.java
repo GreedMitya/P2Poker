@@ -50,7 +50,6 @@ public class PokerGame {
             System.exit(0);
             return;
         }
-
         roundCounter++;
         Logger.Game("\nStarting Round: " + roundCounter);
         deck.shuffle();
@@ -58,10 +57,6 @@ public class PokerGame {
 
         GameStats stats = new GameStats(roundCounter, playerManager.getActivePlayers().size());
         server.sendToAllTCP(stats);
-
-        playerManager.prepareForRound(deck);
-        bettingManager.reset();
-
         playRound(); // ключ к запуску!
     }
     public void setServer(Server server) {
@@ -75,6 +70,7 @@ public class PokerGame {
     }
     private void playRound() {
         bettingManager.setBlinds();
+        playerManager.prepareForRound(deck);
         bettingManager.startBettingRound(BettingManager.BettingPhase.PRE_FLOP);
         this.bettingPhase = BettingManager.BettingPhase.PRE_FLOP;
         if (isRoundComplete()) {
@@ -83,7 +79,6 @@ public class PokerGame {
             endRound();
             return;
         }
-
         table.dealFlop(deck);
         table.showBoard();
         pokerServer.sendChatMessage("Flop: " + table.board.toString());
@@ -187,10 +182,19 @@ public class PokerGame {
         double totalPot,
         Map<Integer, Double> winningsByPlayerId) {
 
-        // 1) Собираем все руки
+        // 1) Собираем все руки, но если победитель один — значит фолд — карты не показываем
         Map<Integer, List<Card>> handsByPlayerId = new HashMap<>();
+
+        boolean isWinByFold = winners.size() == 1 && playerManager.getActivePlayers().size() > 1;
+
         for (Player player : playerManager.getActivePlayers()) {
-            handsByPlayerId.put(player.getConnectionId(), player.getHand());
+            if (isWinByFold) {
+                // Показывать карты не нужно — кладём пустой список
+                handsByPlayerId.put(player.getConnectionId(), new ArrayList<>());
+            } else {
+                // Иначе — показываем настоящие карты
+                handsByPlayerId.put(player.getConnectionId(), player.getHand());
+            }
         }
 
         // 2) Список победителей + их комбы
@@ -201,16 +205,18 @@ public class PokerGame {
         for (Player winner : winners) {
             List<Card> combo = winner.getCombination();
 
-            // Логируем, чтобы убедиться
-            Logger.server("Combo for player " + winner.getName() + ": " + combo);
-            if (combo.size() != 5) {
-                Logger.server("❌ ВНИМАНИЕ: Комбинация содержит не 5 карт! combo.size() = " + combo.size());
+            if (combo == null || combo.size() != 5) {
+                Logger.server("❌ ВНИМАНИЕ: Комбинация у победителя " + winner.getName() + " отсутствует или некорректна! combo=" + combo);
+                combo = new ArrayList<>();
             }
 
-            // Добавляем только один раз
             winnerIds.add(winner.getConnectionId());
             winningCardsList.add(combo);
-            combinationNamesList.add(winner.getNameofCombination());
+            if (isWinByFold) {
+                combinationNamesList.add("Fold Win");  // или просто ""
+            } else {
+                combinationNamesList.add(winner.getNameofCombination() != null ? winner.getNameofCombination() : "No Combination");
+            }
         }
 
         // 3) Заполняем пакет
@@ -225,6 +231,7 @@ public class PokerGame {
         // 4) Шлём всем клиентам
         server.sendToAllTCP(packet);
     }
+
 
 
 
@@ -301,4 +308,12 @@ public class PokerGame {
             System.exit(0);
         }
     }
+    private void sleepBriefly() {
+        try {
+            Thread.sleep(200); // 0.2 секунды
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
 }

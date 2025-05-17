@@ -118,8 +118,11 @@ public class PokerClient {
                     listener.onEndOfHandPacket((EndOfHandPacket) object);
                 }else if (object instanceof RestartGameNotification) {
                     listener.onGameRestart();
+                }else if (object instanceof PlayerOrderPacket) {
+                    listener.onPlayerOrderPacket((PlayerOrderPacket) object);
+                }else if( object instanceof BetUpdatePack){
+                    listener.onBetUpdatePack((BetUpdatePack) object);
                 }
-
             }
 
             public void disconnected(Connection connection) {

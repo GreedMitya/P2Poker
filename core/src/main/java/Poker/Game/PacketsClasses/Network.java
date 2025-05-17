@@ -15,9 +15,11 @@ public class Network {
         kryo.register(Map.class);
         kryo.register(HashMap.class);
         kryo.register(EndOfHandPacket.class);
+        kryo.register(PlayerOrderPacket.class);
         kryo.register(FoldNotification.class);
         kryo.register(PotUpdate.class);
         kryo.register(PlayerBetUpdate.class);
+        kryo.register(BetUpdatePack.class);
         kryo.register(ClearBetsNotification.class);
         kryo.register(TableCardsInfo.class);
         kryo.register(ChatMessage.class);

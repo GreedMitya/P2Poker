@@ -61,7 +61,6 @@ public class PokerServer {
 
             @Override
             public void received(Connection conn, Object obj) {
-                Logger.server("🔥 RAW PACKET: class=" + obj.getClass().getName() + " toString=" + obj.toString());
                 Logger.server("⧗ Received packet of type: " + obj.getClass().getName());
 
 
@@ -166,7 +165,9 @@ public class PokerServer {
      */
     public CompletableFuture<PlayerAction> requestPlayerAction(int connectionId,
                                                                Action[] availableActions,
-                                                               int timeoutSec) {
+                                                               int timeoutSec,
+                                                               double playerCurrentBet,
+                                                               double currentBet) {
         CompletableFuture<PlayerAction> future = new CompletableFuture<>();
         pendingActions.put(connectionId, future);
 
@@ -180,17 +181,19 @@ public class PokerServer {
             ", actions=" + Arrays.toString(availableActions) +
             ", timeout=" + timeoutSec);
 
-        // Таймаут → auto-fold
+        // Таймаут → auto-check или auto-fold
         scheduler.schedule(() -> {
             if (!future.isDone()) {
-                Logger.server("Timeout: auto-fold for " + connectionId);
-                future.complete(new PlayerAction("fold", 0));
+                Logger.server("Timeout: auto-decision for " + connectionId);
+                String action = (playerCurrentBet == currentBet) ? "check" : "fold";
+                future.complete(new PlayerAction(action, 0));
                 pendingActions.remove(connectionId);
             }
         }, timeoutSec, TimeUnit.SECONDS);
 
         return future;
     }
+
     public void sendChatMessage(String text) {
         String name = "sys";
         server.sendToAllTCP(new ChatMessage(text, name));

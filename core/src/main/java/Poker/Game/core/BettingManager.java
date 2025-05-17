@@ -4,10 +4,7 @@ import Poker.Game.PacketsClasses.*;
 import Poker.Game.Server.PokerServer;
 import com.esotericsoftware.kryonet.Server;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 
 
@@ -88,14 +85,6 @@ public class BettingManager {
         Player smallBlindPlayer = activePlayers.get(smallBlindIndex);
         Player bigBlindPlayer = activePlayers.get(bigBlindIndex);
 
-        smallBlindPlayer.decreaseBalance(smallBlind);
-        smallBlindPlayer.setCurrentBetFromPlayers(smallBlind);
-        playerBets.put(smallBlindPlayer, smallBlind);
-        //Нужны ли эти две строки вообще?
-
-        bigBlindPlayer.decreaseBalance(bigBlind);
-        bigBlindPlayer.setCurrentBetFromPlayers(bigBlind);
-        playerBets.put(bigBlindPlayer, bigBlind);
 
         this.currentBet = bigBlind;
         pot += smallBlind + bigBlind;
@@ -105,11 +94,30 @@ public class BettingManager {
         Logger.Game(smallBlindPlayer.getName() + " places small blind: " + smallBlind);
         Logger.Game(bigBlindPlayer.getName() + " places big blind: " + bigBlind);
 
+        List<String> logicalOrder = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            int idx = (dealerIndex + i) % size;
+            logicalOrder.add(activePlayers.get(idx).getName());
+        }
+        // Отправить этот порядок клиентам:
+        PlayerOrderPacket orderPacket = new PlayerOrderPacket(logicalOrder);
+        server.sendToAllTCP(orderPacket);
+
+
+
+        smallBlindPlayer.decreaseBalance(smallBlind);
+        smallBlindPlayer.setCurrentBetFromPlayers(smallBlind);
+        playerBets.put(smallBlindPlayer, smallBlind);
+
+
+        bigBlindPlayer.decreaseBalance(bigBlind);
+        bigBlindPlayer.setCurrentBetFromPlayers(bigBlind);
+        playerBets.put(bigBlindPlayer, bigBlind);
+
         BlindsNotification note = new BlindsNotification("Blinds: \n" + smallBlindPlayer.getName().toString() + " places small blind: " + smallBlind + "\n" + bigBlindPlayer.getName().toString() + " places big blind: " + bigBlind);
         server.sendToAllTCP(note);
         server.sendToAllTCP(new PlayerBalanceUpdate(smallBlindPlayer.getName(), smallBlindPlayer.getBalance()));
         server.sendToAllTCP(new PlayerBalanceUpdate(bigBlindPlayer.getName(), bigBlindPlayer.getBalance()));
-
     }
 
     public Action[] getAvailableActionsFor(Player player) {
@@ -141,7 +149,7 @@ public class BettingManager {
 
         try {
             return pokerServer
-                .requestPlayerAction(connId, avail, seconds)
+                .requestPlayerAction(connId, avail, seconds, player.getCurrentBetFromPlayer(), currentBet)
                 .get(seconds + 1, TimeUnit.SECONDS);
         } catch (Exception e) {
             Logger.Game("Auto-decision for " + connId + ": " + e.getMessage());
@@ -153,141 +161,113 @@ public class BettingManager {
 
 
 
+
     public synchronized void startBettingRound(BettingPhase phase) {
         Logger.Game("Betting round: " + phase);
         boolean roundEnded = false;
         int raiserIndex = -1;
         boolean restartRound = false;
-        int playersCount = playerManager.getActivePlayers().size();
+
+        List<Player> activePlayers = playerManager.getActivePlayers();
+        int playersCount = activePlayers.size();
+
+        Set<Player> hasActed = new HashSet<>(); // Сохраняем кто уже действовал в этом раунде
 
         while (!roundEnded) {
-
-            List<Player> list = new ArrayList<>();
-            for (Player player1 : playerManager.getActivePlayers()) {
-                if (!player1.isAllIn()) {
-                    list.add(player1);
-                }
-            }
-            if (list.size() == 1 && currentBet == 0) {
-                break; // Если остался один игрок, завершаем круг
-            }
-
-            boolean allPlayersMatchedBet = playerManager.getActivePlayers().stream()
-                .filter(p -> !p.isFolded() && !p.isAllIn())
-                .allMatch(p -> p.getCurrentBetFromPlayer() == currentBet);
-
+            activePlayers = playerManager.getActivePlayers(); // на случай фолда
+            playersCount = activePlayers.size();
 
             for (int i = 0; i < playersCount; i++) {
-                currentPlayerIndex = (dealerIndex + 3 + i) % playersCount;
-                if (phase != BettingPhase.PRE_FLOP) {
-                    currentPlayerIndex = (dealerIndex + 1 + i) % playersCount;
-                }
+                currentPlayerIndex = (phase == BettingPhase.PRE_FLOP)
+                    ? (dealerIndex + 3 + i) % playersCount
+                    : (dealerIndex + 1 + i) % playersCount;
 
-                Player player = playerManager.getActivePlayers().get(currentPlayerIndex);
+                Player player = activePlayers.get(currentPlayerIndex);
 
-
-                if (player.isFolded() && player.isAllIn()) continue;
-                List<Player> result = new ArrayList<>();
-                for (Player p : playerManager.getActivePlayers()) {
-                    if (!player.isAllIn()) {
-                        result.add(p);
-                    }
-                }
-                if (result.isEmpty()) {
-                    roundEnded = true;
-                    break;
-                }
-
-
-
-
-
-                // Проверяем, нужно ли завершить круг после рейза
-                if (allPlayersMatchedBet && raiserIndex != -1 && currentPlayerIndex == raiserIndex) {
-                    roundEnded = true;
-                    break;
-                }
-
-
-
-
-
-                if (player.isAllIn()) continue;
-
+                if (player.isFolded() || player.isAllIn()) continue;
 
                 PlayerAction actionObj = getPlayerActionWithTimeout(player, 30);
                 String action = actionObj.actionType.toLowerCase();
                 double raiseAmount = actionObj.amount;
 
-                switch (action.toLowerCase()) {
+                hasActed.add(player); // Запоминаем, что этот игрок уже действовал
+
+                switch (action) {
                     case "fold":
                         player.fold();
-                        System.out.println(player.getName() + " folds.");
                         pokerServer.sendChatMessage(player.getName() + " folds.");
                         break;
 
                     case "check":
                         if (currentBet == player.getCurrentBetFromPlayer()) {
-                            System.out.println(player.getName() + " checks.");
                             pokerServer.sendChatMessage(player.getName() + " checks.");
                         } else {
-                            System.out.println("Cannot check, must call/raise/fold!");
+                            pokerServer.sendChatMessage(player.getName() + " cannot check, folds instead.");
                             player.fold();
                         }
                         break;
 
                     case "call":
                         if (currentBet == 0 || currentBet == player.getCurrentBetFromPlayer()) {
-                            System.out.println(player.getName() + " checks.");
+                            pokerServer.sendChatMessage(player.getName() + " checks.");
                             playerBets.put(player, currentBet);
                             break;
                         }
                         if (player.getBalance() <= currentBet) {
-                            System.out.println(player.getName() + " All-in.");
                             pokerServer.sendChatMessage(player.getName() + " All-in.");
                             playerBets.put(player, player.getBalance() + player.getCurrentBetFromPlayer());
                             placeBet(player, currentBet - player.getCurrentBetFromPlayer());
                             player.setCurrentBetFromPlayers(currentBet);
                             break;
                         }
-                        if (player.getBalance() > currentBet) {
-                            playerBets.put(player, currentBet);
-                            System.out.println(player.getName() + " calls.");
-                            pokerServer.sendChatMessage(player.getName() + " calls.");
-                            placeBet(player, currentBet - player.getCurrentBetFromPlayer());
-                            player.setCurrentBetFromPlayers(currentBet);
-                        }
+                        playerBets.put(player, currentBet);
+                        pokerServer.sendChatMessage(player.getName() + " calls.");
+                        placeBet(player, currentBet - player.getCurrentBetFromPlayer());
+                        player.setCurrentBetFromPlayers(currentBet);
                         break;
 
                     case "raise":
-                        double totalBet = raiseAmount - player.getCurrentBetFromPlayer();              // Сумма рейза
+                        double totalBet = raiseAmount - player.getCurrentBetFromPlayer();
                         if (player.getBalance() <= raiseAmount) {
-                            System.out.println(player.getName() + " goes all-in with " + (player.getBalance() + player.getCurrentBetFromPlayer()));
-                            pokerServer.sendChatMessage(player.getName() + " goes all-in with " + (player.getBalance() + player.getCurrentBetFromPlayer()));
-                            playerBets.put(player, player.getBalance() + player.getCurrentBetFromPlayer());
-                            currentBet = player.getBalance() + player.getCurrentBetFromPlayer();
-                            placeBet(player, player.getBalance() + player.getCurrentBetFromPlayer());
-                            raiserIndex = currentPlayerIndex; // Запоминаем последнего рейзера
+                            double allInTotal = player.getBalance() + player.getCurrentBetFromPlayer();
+                            pokerServer.sendChatMessage(player.getName() + " goes all-in with " + allInTotal);
+                            playerBets.put(player, allInTotal);
+                            currentBet = allInTotal;
+                            placeBet(player, allInTotal);
+                            raiserIndex = currentPlayerIndex;
+                            hasActed.clear(); // Все должны заново отвечать!
+                            hasActed.add(player); // кроме текущего
                             restartRound = true;
                             break;
                         }
                         if (player.getBalance() > totalBet) {
-                            System.out.println(player.getName() + " raises to " + raiseAmount);
                             pokerServer.sendChatMessage(player.getName() + " raises to " + raiseAmount);
                             currentBet = raiseAmount;
                             playerBets.put(player, currentBet);
                             placeBet(player, totalBet);
-                            raiserIndex = currentPlayerIndex; // Запоминаем последнего рейзера
+                            raiserIndex = currentPlayerIndex;
+                            hasActed.clear();
+                            hasActed.add(player);
                             restartRound = true;
                         }
                         break;
-
-                    default:
-                        System.out.println("Invalid action. Please choose fold, check, call, or raise.");
                 }
 
+                // Условие завершения раунда: все активные игроки поставили одинаково и все сделали хотя бы одно действие
+                boolean allMatched = activePlayers.stream()
+                    .filter(p -> !p.isFolded() && !p.isAllIn())
+                    .allMatch(p -> p.getCurrentBetFromPlayer() == currentBet);
 
+                boolean allActed = activePlayers.stream()
+                    .filter(p -> !p.isFolded() && !p.isAllIn())
+                    .allMatch(hasActed::contains);
+
+                if (allMatched && allActed) {
+                    roundEnded = true;
+                    break;
+                }
             }
+
             if (restartRound) {
                 restartRound = false;
                 continue;
@@ -295,25 +275,31 @@ public class BettingManager {
 
             roundEnded = checkIfRoundEnded();
         }
-        System.out.println("Round " + phase + " finished!");
-        System.out.println("Total pot: " + pot);
-        //potManager.setMainPot(pot);//Перемещаем пот с улицы в ПотМенеджер;
-        // Дальше нужно реализовать перенос учавствовавших игроков и их ставки в ПотМенеджер;
-        //System.out.println(potManager.getMainPot());
-        // Записывает кто сколько положил в конце раунда! в Map;
-        // Дальше этот список тоже передаем в PotManager для обработки и разбивки на сайд поты!
-        //System.out.println("Transfer to potManger: " + playerBets.toString());
-        if(phase == BettingPhase.PRE_FLOP) potManager.setPreFlop(playerBets);
-        if(phase == BettingPhase.FLOP) potManager.setFlop(playerBets);
-        if(phase == BettingPhase.TURN) potManager.setTurn(playerBets);
-        if(phase == BettingPhase.RIVER) potManager.setRiver(playerBets);
-        // А затем обнуляем перед следующим раундом!
+
+        Logger.Game("Round " + phase + " finished!");
+        Logger.Game("Total pot: " + pot);
+
+        HashMap<Integer, Double> betsToSend = new HashMap<>();
+        for (Map.Entry<Player, Double> entry : playerBets.entrySet()) {
+            betsToSend.put(entry.getKey().getConnectionId(), entry.getValue());
+        }
+
+        BetUpdatePack betUpdatePack = new BetUpdatePack();
+        betUpdatePack.setBets(betsToSend);
+        server.sendToAllTCP(betUpdatePack);
+
+        if (phase == BettingPhase.PRE_FLOP) potManager.setPreFlop(playerBets);
+        if (phase == BettingPhase.FLOP) potManager.setFlop(playerBets);
+        if (phase == BettingPhase.TURN) potManager.setTurn(playerBets);
+        if (phase == BettingPhase.RIVER) potManager.setRiver(playerBets);
+
+        betsToSend.clear();
         playerBets.clear();
-        playerManager.getActivePlayers().forEach(player -> player.setCurrentBetFromPlayers(0));
+        playerManager.getActivePlayers().forEach(p -> p.setCurrentBetFromPlayers(0));
         currentBet = 0;
         pot = 0;
-
     }
+
 
 
     private boolean checkIfRoundEnded() {
