@@ -21,6 +21,28 @@ public class StartGame {
         this.pokerServer = pokerServer;
         this.server = pokerServer.getServer();
     }
+    public void remove(int connectionID) {
+        Player toRemove = null;
+
+        for (Player p : players) {
+            if (p.getConnectionId() == connectionID) {
+                toRemove = p;
+                break;
+            }
+        }
+
+        if (toRemove != null) {
+            players.remove(toRemove);
+            Logger.Game("Удалён игрок: " + toRemove.getName());
+        } else {
+            Logger.Game("⚠ Не найден игрок с connectionId=" + connectionID);
+        }
+
+        if (game != null && game.playerManager != null) {
+            game.playerManager.reloadActivePlayersList();
+        }
+    }
+
 
 
     public void addPlayer(String nickname, int connectionID) {

@@ -44,12 +44,14 @@ public class PokerGame {
 
     public void startNextRound() {
         // Условие выхода (если остался 1 игрок)
-        if (playerManager.getActivePlayers().size() <= 1) {
-            Logger.Game("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
-            pokerServer.sendChatMessage("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
-            System.exit(0);
-            return;
-        }
+            if (playerManager.getActivePlayers().size() <= 1) {
+                   String winner = playerManager.getActivePlayers().get(0).getName();
+                    Logger.Game("Game Over. Winner: " + winner);
+                    pokerServer.sendChatMessage("Game Over. Winner: " + winner);
+                    // Только отправляем на сервер shutdown-флоу:
+                pokerServer.sendWinnerAndShutdown(winner);
+                return;
+                }
         roundCounter++;
         Logger.Game("\nStarting Round: " + roundCounter);
         deck.shuffle();
@@ -299,15 +301,11 @@ public class PokerGame {
         if (playerManager.getActivePlayers().size() == 1) {
             System.out.println("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
             pokerServer.sendChatMessage("Game Over. Winner: " + playerManager.getActivePlayers().get(0).getName());
-            Stop();
+            pokerServer.sendWinnerAndShutdown(playerManager.getActivePlayers().get(0).getName());
+            return;
         }
     }
 
-    private void Stop() {
-        if (playerManager.getActivePlayers().size() == 1) {
-            System.exit(0);
-        }
-    }
     private void sleepBriefly() {
         try {
             Thread.sleep(200); // 0.2 секунды

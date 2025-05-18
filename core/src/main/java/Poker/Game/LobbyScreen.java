@@ -26,15 +26,14 @@ public class LobbyScreen implements Screen {
 
     @Override
     public void show() {
-
         stage = new Stage(new ScreenViewport());
         Gdx.input.setInputProcessor(stage);
 
-
-        // Загружаем готовый скин
-        Skin skin = new Skin(Gdx.files.internal("sgx/skin/sgx-ui.json"),
-            new TextureAtlas(Gdx.files.internal("sgx/skin/sgx-ui.atlas")));
-
+        // Загружаем скин и атлас
+        skin = new Skin(
+            Gdx.files.internal("sgx/skin/sgx-ui.json"),
+            new TextureAtlas(Gdx.files.internal("sgx/skin/sgx-ui.atlas"))
+        );
 
         // Создаем виджеты
         final TextField nickField = new TextField("", skin);
@@ -61,26 +60,42 @@ public class LobbyScreen implements Screen {
             }
         });
 
-        // Загружаем фон (замени путь на актуальный)
+        // Фон
         Texture bgTexture = new Texture(Gdx.files.internal("sgx/raw/background.png"));
         Image background = new Image(bgTexture);
-        background.setFillParent(true); // Растягивает на весь экран
-        stage.addActor(background); // Добавляем первым, чтобы был позади
+        background.setFillParent(true);
+        stage.addActor(background); // Сначала фон
 
-
-        // Используем таблицу для расположения
+        // Таблица для UI
         Table table = new Table();
         table.setFillParent(true);
         table.center();
 
-        float fieldW = 300, fieldH = 40, btnW = 250, btnH = 50, pad = 15;
-        table.add(nickField).size(fieldW, fieldH).pad(pad).row();
-        table.add(ipField).size(fieldW, fieldH).pad(pad).row();
-        table.add(hostBtn).size(btnW, btnH).pad(pad).row();
-        table.add(joinBtn).size(btnW, btnH);
+        float pad = 20f;
 
-        stage.addActor(table);
+        table.add(nickField)
+            .width(Value.percentWidth(0.6f, table))
+            .height(Value.percentHeight(0.07f, table))
+            .pad(pad).row();
+
+        table.add(ipField)
+            .width(Value.percentWidth(0.6f, table))
+            .height(Value.percentHeight(0.07f, table))
+            .pad(pad).row();
+
+        table.add(hostBtn)
+            .width(Value.percentWidth(0.5f, table))
+            .height(Value.percentHeight(0.08f, table))
+            .pad(pad).row();
+
+        table.add(joinBtn)
+            .width(Value.percentWidth(0.5f, table))
+            .height(Value.percentHeight(0.08f, table))
+            .pad(pad);
+
+        stage.addActor(table); // Затем UI
     }
+
 
     private void startGame(boolean isHost, String ip, String nick) {
         if (isHost) {
@@ -93,7 +108,7 @@ public class LobbyScreen implements Screen {
             }, "PokerServer").start();
         }
 
-        PokerClient client = new PokerClient();
+        PokerClient client = new PokerClient(app);
         GameScreen gameScreen = new GameScreen(app, client,isHost);
         app.setScreen(gameScreen);
 

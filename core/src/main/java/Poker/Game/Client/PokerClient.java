@@ -1,8 +1,11 @@
 package Poker.Game.Client;
 
 import Poker.Game.ClientListener;
+import Poker.Game.LobbyScreen;
 import Poker.Game.PacketsClasses.*;
 
+import Poker.Game.PokerApp;
+import Poker.Game.WinnerScreen;
 import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.Client;
@@ -13,10 +16,13 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.badlogic.gdx.Gdx.app;
+
 /**
  * Клиент для покер-рума, «чистый» от консоли, отдаёт все события в ClientListener.
  */
 public class PokerClient {
+    private PokerApp pokerApp;
     private int clientId;
     private Client client;
     private ClientListener listener;
@@ -24,6 +30,11 @@ public class PokerClient {
     private String name;
     private final Map<Integer, String> idToNickname   = new HashMap<>();
     private final Map<String, Integer> nicknameToId   = new HashMap<>();
+
+    public PokerClient(PokerApp pokerApp) {
+        this.pokerApp = pokerApp;
+    }
+
 
 
     public void registerPlayer(int id, String nickname) {
@@ -122,17 +133,24 @@ public class PokerClient {
                     listener.onPlayerOrderPacket((PlayerOrderPacket) object);
                 }else if( object instanceof BetUpdatePack){
                     listener.onBetUpdatePack((BetUpdatePack) object);
+                }else if (object instanceof ReturnToLobbyPacket) {
+                    app.postRunnable(() -> {
+                        Logger.client("Возврат на стартовый экран");
+                        pokerApp.setScreen(new LobbyScreen(pokerApp)); // или какой у тебя начальный экран
+                    });
+                }else if (object instanceof WinnerPacket){
+                    onWinnerPacket((WinnerPacket) object);
                 }
+
             }
 
             public void disconnected(Connection connection) {
-                Logger.client( "Disconnected from server, shutting down…");
-                // Сначала закрываем клиент
+                Logger.client("Disconnected from server, returning to lobby…");
                 client.stop();
-                // Даем немного времени, чтобы все внутренние потоки клиента завершились
-                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
-                // А теперь выходим из JVM (вызовет хук на сервере, если запущен в том же процессе)
-                System.exit(0);
+                app.postRunnable(() -> {
+                    // Используй переданный pokerApp напрямую
+                    pokerApp.setScreen(new LobbyScreen(pokerApp));
+                });
             }
         });
 
@@ -219,4 +237,18 @@ public class PokerClient {
     public void sendRestart(RestartGameRequest req) {
         client.sendTCP(req);
     }
+    public void onWinnerPacket(WinnerPacket packet) {
+        String winnerName = packet.getName();
+
+        Gdx.app.postRunnable(() -> {
+            if (winnerName.equals(this.name)) {
+                // Мы победитель — показываем WinnerScreen на 5 секунд
+                pokerApp.setScreen(new WinnerScreen(this.pokerApp, winnerName));
+            } else {
+                // Кто-то другой выиграл — сразу возвращаемся в Lobby
+                pokerApp.setScreen(new LobbyScreen(this.pokerApp));
+            }
+        });
+    }
+
 }

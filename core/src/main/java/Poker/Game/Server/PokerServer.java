@@ -3,32 +3,36 @@ package Poker.Game.Server;
 import Poker.Game.PacketsClasses.*;
 import Poker.Game.core.Player;
 import Poker.Game.core.StartGame;
-import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.*;
 
 public class PokerServer {
+    private final Set<Integer> activeConnections = ConcurrentHashMap.newKeySet();
     private final Map<Integer, Boolean> playerReadyStatus = new HashMap<>();
     private Server server;
     private StartGame startGame;
-
+    private volatile boolean isShuttingDown = false;
     // Храним nickname по connectionId
     private final Map<String,Integer> playerNicknames = new HashMap<>();
-
     // pendingActions: ключ — connectionId игрока, значение — будущее выбранного действия
     private final Map<Integer, CompletableFuture<PlayerAction>> pendingActions = new ConcurrentHashMap<>();
 
 
-    // Служба для таймаутов (Java 8)
+    // вместо Executors.newScheduledThreadPool(4);
     private final ScheduledExecutorService scheduler =
-        Executors.newScheduledThreadPool(4);
+        Executors.newScheduledThreadPool(4, r -> {
+            Thread t = new Thread(r);
+            t.setDaemon(true);  // демон — не будет мешать JVM завершиться
+            return t;
+        });
+
 
     public void start() throws IOException {
         server = new Server();
@@ -43,21 +47,16 @@ public class PokerServer {
             @Override
             public void connected(Connection conn) {
                 Logger.server("connID=" + conn.getID() + " connected from " + conn.getRemoteAddressTCP());
+                activeConnections.add(conn.getID());
             }
-
 
             @Override
-            public void disconnected(Connection connection) {
-                Gdx.app.log("Server", "Client disconnected (id=" + connection.getID() + ")");
-                // Проверим, остались ли ещё активные клиенты
-                if (server.getConnections().size() == 0) {
-                    Gdx.app.log("Server", "No more clients, stopping server…");
-                    // Остановим сервер: закроем сокеты и потоки
-                    server.stop();
-                    // Если хотим — завершаем программу целиком
-                    System.exit(0);
-                }
+            public void disconnected(Connection conn) {
+
             }
+
+
+
 
             @Override
             public void received(Connection conn, Object obj) {
@@ -92,15 +91,17 @@ public class PokerServer {
                     if (conn.getID() == 1 && startGame.getPlayers().size() >= 2) {
                         server.sendToAllTCP(new GameStartedNotification());
                         Logger.server("Game started by host");
-                        new Thread(() -> {
+                        Thread game = new Thread(() -> {
                             try {
-                                startGame.startGame(); // основной запуск игры
+                                startGame.startGame();
+                                // основной запуск игры
                             } catch (Exception e) {
-                                Gdx.app.error("Server", "Ошибка при запуске игры: " + e.getMessage(), e);
-                                server.stop(); // остановим сервер, если что-то пошло не так
-                                System.exit(1); // опционально, если хочешь завершить JVM
+                                Logger.server("Ошибка при запуске игры: " + e.getMessage());
+                                e.printStackTrace(); // или Logger.server(e)
+                                server.stop(); // остановим сервер
                             }
-                        }).start();
+
+                        });game.setDaemon(true);game.start();
                     } else {
                         Logger.server("Нельзя запустить игру: не хост или мало игроков");
                     }
@@ -133,12 +134,8 @@ public class PokerServer {
             }
         });
 
-        server.bind(54555, 54777);  // выбирайте ваши порты
+        server.bind(54555, 54777);// выбирайте ваши порты
         server.start();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            Gdx.app.log("Server", "JVM shutdown hook: stopping server…");
-            server.stop();
-        }));
 
 
         // KeepAlive-пинг всем клиентам
@@ -241,4 +238,46 @@ public class PokerServer {
         startGame.getGame().endRound();
         startGame.getGame().startNextRound();
     }
+
+    public void sendWinnerAndShutdown(String winnerName) {
+        if (isShuttingDown) return;
+        isShuttingDown = true;
+
+        // 1) Мгновенно рассылаем победителем
+        WinnerPacket win = new WinnerPacket();
+        win.setName(winnerName);
+        server.sendToAllTCP(win);
+
+        // 2) Через 5 сек — возвращаем всех в лобби
+        scheduler.schedule(() -> {
+            server.sendToAllTCP(new ReturnToLobbyPacket());
+
+            // 3) Ещё через 1 сек — останавливаем сервер
+            scheduler.schedule(this::shutdownServer, 1, TimeUnit.SECONDS);
+
+        }, 5, TimeUnit.SECONDS);
+    }
+
+// Удаляем старый sendWinner(!) и в core-коде вызываем именно sendWinnerAndShutdown(...)
+
+
+
+    public void shutdownServer() {
+        System.out.println("[SERVER] Shutting down...");
+        BroadcastResponder.stopListening();
+
+
+        // 1) Останавливаем таймеры
+        scheduler.shutdownNow();
+        try {
+            scheduler.awaitTermination(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {}
+
+        // 2) Останавливаем KryoNet
+        server.stop();
+
+    }
+
+
+
 }

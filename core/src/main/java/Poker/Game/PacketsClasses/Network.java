@@ -20,6 +20,8 @@ public class Network {
         kryo.register(PotUpdate.class);
         kryo.register(PlayerBetUpdate.class);
         kryo.register(BetUpdatePack.class);
+        kryo.register(ReturnToLobbyPacket.class);
+        kryo.register(WinnerPacket.class);
         kryo.register(ClearBetsNotification.class);
         kryo.register(TableCardsInfo.class);
         kryo.register(ChatMessage.class);
