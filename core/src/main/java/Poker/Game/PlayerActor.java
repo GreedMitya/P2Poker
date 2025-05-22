@@ -149,6 +149,12 @@ public class PlayerActor extends WidgetGroup {
         }
         handCardActors.clear();
     }
+    public void dimCards() {
+        for (CardActor card : handCardActors) {
+            card.setDimmed(true);
+        }
+    }
+
     public void updateBalance(double newBalance) {
         balanceLabel.setText((int) newBalance + "$");
     }

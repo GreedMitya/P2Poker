@@ -160,8 +160,7 @@ public class PokerGame {
                     p.evaluateHand();
                     p.setCombination();
                     pokerServer.sendChatMessage(
-                        p.getName() + ": " +p.getCombination()+ ";" + p.getNameofCombination()
-                    );
+                       p.getName() + "'s combination: " + p.getNameofCombination());
                     contenders.add(p);
                 }
             }
@@ -289,7 +288,6 @@ public class PokerGame {
 
 
     public void endRound() {
-        System.out.println("Ending round...");
         pokerServer.sendChatMessage("Ending round...");
         table.clearBoard(deck);
         playerManager.collectCards(deck);

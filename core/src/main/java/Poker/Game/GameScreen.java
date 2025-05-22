@@ -9,20 +9,16 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.*;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.actions.SequenceAction;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
-import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
-import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
-import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.Timer;
-import com.badlogic.gdx.utils.Timer.Task;
+
 
 
 import java.util.*;
@@ -49,31 +45,35 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     private List<String> currentPlayers = new ArrayList<>();
     private final Map<String, Double> playerBalances = new HashMap<>();
     // === Карты текущего игрока и оппонентов ===
-    private List<Card> myHand = new ArrayList<>();
     private final List<CardActor> playerCardActors = new ArrayList<>();
     private final Map<Integer, List<CardActor>> opponentCardActors = new HashMap<>();
     // === Карты на столе ===
     private final List<CardActor> tableCardActors = new ArrayList<>();
     // === UI: кнопки, слайдер, лейблы, чат ===
-    private TextButton startBtn, foldBtn, callBtn, raiseBtn, checkBtn,restartBtn;
-    private Slider    raiseSlider;
+    private ControlPanel controlPanel;
     private Label     raiseAmountLabel, potLabel;
-    private Table     chatMessages;
-    private ScrollPane chatScroll;
-    private TextField chatInputField;
-    private TextButton sendButton;
     // === Для управления потоком действий ===
     private int    currentPlayerId;
-    private boolean amI;
     private Action[] currentActions;
     // === Транзитные актёры (летящие поты, метки комбинаций) ===
     private Map<Integer, Double> betMap = new HashMap<>();
     private final List<Actor> transientActors = new ArrayList<>();
+    private Timer.Task hideButtonsTask; // поле класса
+    private float uiScale;
+    private ChatPanel chatPanel;
+    private ActionPanel actionPanel;
+
+
+
     public GameScreen(PokerApp app, PokerClient client, boolean isHost) {
+        UIScale.ui = Math.min(WORLD_WIDTH, WORLD_HEIGHT) / 800f;
+        this.uiScale = UIScale.ui;  // обязательно сохранить в поле класса
         this.app    = app;
         this.client = client;
         this.isHost = isHost;
         this.client.setListener(this);
+        this.skin = new Skin(Gdx.files.internal("sgx/skin/sgx-ui.json"),
+            new TextureAtlas(Gdx.files.internal("sgx/skin/sgx-ui.atlas")));
     }
 
     public int getMyPlayerId() {
@@ -88,40 +88,23 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void show() {
         // Загрузка карт
         CardTextureManager.load();
-
         // Сцена и фон
         avatarTexture = new Texture(Gdx.files.internal("sgx/raw/defaulrAvatar.png"));
         FitViewport viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT);
         stage = new Stage(viewport);
         Gdx.input.setInputProcessor(stage);
-
-
-        float worldW = viewport.getWorldWidth();
-        float worldH = viewport.getWorldHeight();
-        UIScale.ui = Math.min(worldW, worldH) / 800f;
-        float uiScale = UIScale.ui;
         cardWidth  = UIConfig.CARD_BASE_WIDTH  * UIScale.ui;
         cardHeight = UIConfig.CARD_BASE_HEIGHT * UIScale.ui;
-        radius     = Math.min(worldW, worldH) * 0.35f;
-        tableCenterX = worldW * 0.5f + worldW * 0.05f;
-        tableCenterY = worldH * 0.5f - worldH * 0.02f;
-
+        radius     = Math.min(WORLD_WIDTH, WORLD_HEIGHT) * 0.35f;
+        tableCenterX = WORLD_WIDTH * 0.5f + WORLD_WIDTH * 0.05f;
+        tableCenterY = WORLD_HEIGHT * 0.5f - WORLD_HEIGHT * 0.02f;
         Image bg = new Image(new Texture(Gdx.files.internal("sgx/raw/171.jpg")));
         bg.setSize(WORLD_WIDTH, WORLD_HEIGHT);
         bg.setPosition(0, 0);
         stage.addActor(bg);
-
         // Стол
         Texture tableTex = new Texture(Gdx.files.internal("sgx/raw/Atp.png"), true);
-        tableTex.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        Image table = getTable(tableTex);
-        stage.addActor(table);
-
-        // Skin и ввод
-        skin = new Skin(Gdx.files.internal("sgx/skin/sgx-ui.json"),
-            new TextureAtlas(Gdx.files.internal("sgx/skin/sgx-ui.atlas")));
-        Gdx.input.setInputProcessor(stage);
-
+        stage.addActor(new TableActor(tableTex, WORLD_WIDTH, WORLD_HEIGHT));
         // Пот
         potLabel = new Label("Pot: 0", skin);
         float fontScale = Math.min(Gdx.graphics.getWidth(), Gdx.graphics.getHeight()) / 800f;
@@ -131,189 +114,58 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             stage.getHeight()/2f + 100);
         stage.addActor(potLabel);
 
-        setupActionButtons();
-        setupChat();
-    }
-
-    private Image getTable(Texture tableTex) {
-        float worldW = stage.getViewport().getWorldWidth();
-        float worldH = stage.getViewport().getWorldHeight();
-        Image table = new Image(new TextureRegionDrawable(new TextureRegion(tableTex)));
-        table.setSize(worldW * 0.9f, worldH * 0.9f);
-        table.setPosition((worldW - table.getWidth())/2f + worldW*0.05f,
-            (worldH - table.getHeight())/2f - worldH*0.02f);
-        table.setTouchable(Touchable.disabled);
-        return table;
-    }
+        chatPanel = new ChatPanel(skin, client, uiScale);
+        chatPanel.setPosition(2f * uiScale, 2f * uiScale);
+        chatPanel.pack();
+        stage.addActor(chatPanel);
 
 
-    private void setupActionButtons() {
-        float worldW = stage.getViewport().getWorldWidth();
-        float worldH = stage.getViewport().getWorldHeight();
-        float uiScale = Math.min(worldW, worldH) / 800f;
 
-        float buttonW = 110f * uiScale;
-        float buttonH =  60f * uiScale;
-        float padX    =  10f * uiScale;
-        float bottomY =  20f * uiScale;
-
-
-        // Создание кнопок
-        startBtn  = new TextButton("Start Game", skin);
-        restartBtn= new TextButton("Restart Game", skin);
-        foldBtn   = new TextButton("Fold", skin);
-        callBtn   = new TextButton("Call", skin);
-        checkBtn  = new TextButton("Check", skin);
-        raiseBtn  = new TextButton("Raise", skin);
-        raiseSlider      = new Slider(20, 1000, 10, false, skin);
-        raiseAmountLabel = new Label("20$", skin);
-
-        // Размеры и позиции
-        float buttonWidth  = 110f * uiScale;
-        float buttonHeight = 60f * uiScale;
-        float paddingX     = 10f * uiScale;
-
-
-        // Позиции кнопок
-        startBtn.setSize(300 * uiScale, buttonHeight);
-        startBtn.setPosition(stage.getWidth()/2f - startBtn.getWidth()/2f, bottomY);
-
-        restartBtn.setSize(100 * uiScale, buttonHeight);
-        restartBtn.setPosition(paddingX, stage.getHeight() - buttonHeight - paddingX);
-
-        foldBtn.setSize(buttonWidth, buttonHeight);
-        foldBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX) * 3, bottomY);
-
-        callBtn.setSize(buttonWidth, buttonHeight);
-        callBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX) * 2, bottomY);
-
-        checkBtn.setSize(buttonWidth, buttonHeight);
-        checkBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX) * 2, bottomY); // одинаково с callBtn
-
-        raiseBtn.setSize(buttonWidth, buttonHeight);
-        raiseBtn.setPosition(stage.getWidth() - (buttonWidth + paddingX), bottomY);
-
-        raiseSlider.setSize(200 * uiScale, 60 * uiScale);
-        raiseSlider.setPosition(stage.getWidth() - raiseSlider.getWidth() - paddingX, bottomY + buttonHeight + paddingX);
-
-        raiseAmountLabel.setFontScale(uiScale);
-        raiseAmountLabel.setPosition(raiseSlider.getX(), raiseSlider.getY() + raiseSlider.getHeight() + paddingX);
-        // listeners…
-        startBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
+        controlPanel = new ControlPanel(skin, uiScale, new ControlPanel.ControlListener() {
+            @Override public void onStart() {
                 client.sendGameStart();
-                startBtn.setVisible(false);
+                controlPanel.startBtn.setVisible(false);
             }
-        });
-        restartBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                RestartGameRequest req = new RestartGameRequest();
-                req.senderId = 1; // или client.getMyId(), если он уже определён как 1
-                client.sendRestart(req);
-            }
-        });
-        foldBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                System.out.println("Fold button clicked!");
-                client.sendFold(currentPlayerId);
-                hideActionUI();
-            }
-        });
-        callBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                System.out.println("Call button clicked!" + " sending call action from: " + currentPlayerId);
-                client.sendCall(currentPlayerId);
-                hideActionUI();
-            }
-        });
-        checkBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                System.out.println("Check button clicked!");
-                client.sendCheck(currentPlayerId);
-                hideActionUI();
-            }
-        });
-        raiseBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                System.out.println("Raise button clicked!");
-                client.sendRaise(currentPlayerId, (int)raiseSlider.getValue());
-                raiseSlider.setValue(20);
-                hideActionUI();
-            }
-        });
-        raiseSlider.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                raiseAmountLabel.setText((int)raiseSlider.getValue() + "$");
-            }
-        });
-        // Добавление на сцену
-        hideActionUI();
-        stage.addActor(startBtn);
-        stage.addActor(restartBtn);
-        stage.addActor(foldBtn);
-        stage.addActor(callBtn);
-        stage.addActor(checkBtn);
-        stage.addActor(raiseBtn);
-        stage.addActor(raiseSlider);
-        stage.addActor(raiseAmountLabel);
-    }
 
+            @Override public void onRestart() {
+                client.sendRestart();
+            }
+        });
 
-    private void hideActionUI() {
-        startBtn.setVisible(false);
-        restartBtn.setVisible(false);
-        foldBtn.setVisible(false);
-        callBtn.setVisible(false);
-        checkBtn.setVisible(false);
-        raiseBtn.setVisible(false);
-        raiseSlider.setVisible(false);
-        raiseAmountLabel.setVisible(false);
-    }
-    private void setupChat() {
-        float worldW = stage.getViewport().getWorldWidth();
-        float worldH = stage.getViewport().getWorldHeight();
-        float uiScale = Math.min(worldW, worldH) / 800f; // Базовая шкала для адаптации под экран
-
-        // Таблица сообщений чата
-        chatMessages = new Table();
-        chatMessages.top().left();
-        chatMessages.defaults().pad(1 * uiScale).left().width(380f * uiScale); // Подстраиваем паддинг и ширину под масштаб
-
-        // ScrollPane для прокрутки сообщений
-        chatScroll = new ScrollPane(chatMessages, skin);
-        chatScroll.setScrollingDisabled(true, false); // Только вертикальная прокрутка
-        chatScroll.setSize(400f * uiScale, 200f * uiScale);
-        chatScroll.setPosition(10 * uiScale, 50 * uiScale); // Отступы тоже масштабируем
-        stage.addActor(chatScroll);
-
-        // Поле ввода текста
-        chatInputField = new TextField("", skin);
-        chatInputField.setMessageText("Type a message...");
-        chatInputField.setSize(320f * uiScale, 40f * uiScale);
-        chatInputField.setPosition(10 * uiScale, 10 * uiScale);
-        stage.addActor(chatInputField);
-
-        // Кнопка отправки
-        sendButton = new TextButton("Send", skin);
-        sendButton.setSize(80f * uiScale, 40f * uiScale);
-        sendButton.setPosition(chatInputField.getX() + chatInputField.getWidth() + 10 * uiScale, chatInputField.getY());
-        sendButton.addListener(new ChangeListener() {
+        controlPanel.setPosition((5f)  * uiScale, (WORLD_HEIGHT-5) * uiScale); // например, левый нижний угол с отступом
+        stage.addActor(controlPanel);
+        actionPanel = new ActionPanel(skin, new ActionPanel.ActionListener() {
             @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                String msg = chatInputField.getText().trim();
-                if (!msg.isEmpty()) {
-                    client.sendChatMessage(msg);
-                    chatInputField.setText("");
-
-                    // Прокрутка в самый низ
-                    chatScroll.layout(); // Убедимся, что ScrollPane обновлён
-                    chatScroll.setScrollPercentY(1f); // Прокрутка вниз
+            public void onFold() {
+                client.sendFold(myPlayerId);
+                PlayerActor me = playerActorsById.get(myPlayerId);
+                if (me != null) {
+                    me.dimCards(); // затемняем карты
                 }
             }
-        });
-        stage.addActor(sendButton);
-    }
 
+
+            @Override public void onCall() {
+                client.sendCall(myPlayerId);
+            }
+
+            @Override public void onCheck() {
+                client.sendCheck(myPlayerId);
+            }
+
+            @Override public void onRaise(int amount) {
+                client.sendRaise(myPlayerId, amount);
+            }
+        }, uiScale);
+        actionPanel.setPosition(
+            (WORLD_WIDTH - actionPanel.getWidth()),
+            20f * uiScale
+        );
+        stage.addActor(actionPanel);
+
+
+
+    }
     // === Resize / render / dispose ===
     @Override
     public void resize(int width, int height) {
@@ -325,6 +177,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     @Override public void render(float delta){
         ScreenUtils.clear(0,0,0,1);
         stage.act(delta);
+        chatPanel.updateLayoutIfNeeded();
         stage.draw();
     }
     @Override public void pause()  {}
@@ -341,87 +194,12 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         this.currentPlayers = nicknames;
         setMyPlayerId(client.getMyId());
         Gdx.app.postRunnable(() -> {
-            if (isHost && nicknames.size() >= 2) startBtn.setVisible(true);restartBtn.setVisible(true);
-        });
-    }
-
-    @Override
-    public void onJoinResponse(JoinResponse resp) {
-        Gdx.app.postRunnable(() -> {
-            addChatMessage("Connected: " + resp.message);
-        });
-    }
-
-    @Override
-    public void onGameStarted(GameStartedNotification note) {
-        Gdx.app.postRunnable(() -> addChatMessage("Game Started!"));restartBtn.setVisible(true);
-    }
-
-
-    @Override
-    public void onGameStats(GameStats stats) {
-        Gdx.app.postRunnable(() ->
-            addChatMessage("Stats: " + stats.getStats())
-        );
-    }
-
-    private void arrangePlayersOnTable(List<String> logicalOrder) {
-        // Удаляем старые
-        for (PlayerActor pa : playerActorsById.values()) pa.remove();
-        playerActorsById.clear();
-
-        float worldW = stage.getViewport().getWorldWidth();
-        float worldH = stage.getViewport().getWorldHeight();
-
-        float tableCenterX = worldW * 0.5f;
-        float tableCenterY = worldH * 0.5f - worldH * 0.08f;
-        float radius       = Math.min(worldW, worldH) * 0.3f;
-
-        int total = logicalOrder.size();
-        int myIndex = logicalOrder.indexOf(client.getNickName());
-
-        // Сдвигаем логический список так, чтобы "я" был первым
-        List<String> visualOrder = new ArrayList<>();
-        for (int i = 0; i < total; i++) {
-            visualOrder.add(logicalOrder.get((myIndex + i) % total));
-        }
-
-        for (int i = 0; i < total; i++) {
-            String nick = visualOrder.get(i);
-            int id = client.getIdByNickname(nick);
-            boolean amI = (id == myPlayerId);
-
-            PlayerActor pa = new PlayerActor(amI, id, nick,
-                playerBalances.getOrDefault(nick, 0.0),
-                avatarTexture, skin
-            );
-
-            // По кругу, начиная с "я" внизу (угол -PI/2)
-            float angle = (float) (-Math.PI / 2 + 2 * Math.PI * i / total);
-
-            float actorCenterX = tableCenterX + radius * (float) Math.cos(angle);
-            float actorCenterY = tableCenterY + radius * (float) Math.sin(angle);
-
-            float actorX = actorCenterX - pa.getWidth() / 2f;
-            float actorY = actorCenterY;
-
-            float topCorrection = pa.getHeight() * 0.6f;
-            float bottomCorrection = pa.getHeight() * 0.2f;
-
-            if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
-                actorY -= topCorrection;
-            } else {
-                actorY -= bottomCorrection;
+            if (isHost && nicknames.size() >= 2 && controlPanel != null) {
+                controlPanel.startBtn.setVisible(true);
+                controlPanel.restartBtn.setVisible(true);
             }
-
-            pa.setPosition(actorX, actorY);
-            stage.addActor(pa);
-            playerActorsById.put(id, pa);
-        }
+        });
     }
-
-
-
     @Override
     public void onPlayerBalanceUpdate(PlayerBalanceUpdate upd) {
         playerBalances.put(upd.name, upd.newBalance);
@@ -437,11 +215,10 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             pa.showBet(upd.amount);
         });
     }
-
     @Override
     public void onBlinds(BlindsNotification note) {
         Gdx.app.postRunnable(() -> {
-            addChatMessage(note.getSmallBlind());
+            chatPanel.addMessage(note.getSmallBlind());
             potLabel.setVisible(true);
             for (PlayerActor playerActor : playerActorsById.values()) {
                 if (!playerActor.isLocalPlayer()) {
@@ -450,88 +227,89 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             }
         });
     }
-
-    private Timer.Task hideButtonsTask; // поле класса
-
     @Override
     public void onActionRequest(ActionRequest req) {
         System.out.println("onActionRequest called for player: " + req.playerId);
         this.currentPlayerId  = req.playerId;
         this.currentActions   = req.availableActions;
 
-        // Если до этого был запущен таймер — отменяем его
+        // Отменяем предыдущий таймер скрытия
         if (hideButtonsTask != null) {
             hideButtonsTask.cancel();
             hideButtonsTask = null;
         }
 
-        Gdx.app.postRunnable(() -> {
-            Set<String> availableNames = new HashSet<>();
-            for (Action action : currentActions) {
-                availableNames.add(action.name);
+        // Показываем панель действий только если это ты
+        if (req.playerId == myPlayerId) {
+            Gdx.app.postRunnable(() -> {
+                actionPanel.show();
+
+                // Обновим доступные кнопки:
+                updateActionButtons(req.availableActions);
+            });
+        } else {
+            actionPanel.hide(); // прячем у других
+        }
+        hideButtonsTask = Timer.schedule(new Timer.Task() {
+            @Override
+            public void run() {
+                Gdx.app.postRunnable(() -> actionPanel.hide());
             }
+        }, 30); // через 30 секунд
 
-            System.out.println("Available actions: " + availableNames);
-
-            checkBtn.setVisible(availableNames.contains("check"));
-            callBtn.setVisible(availableNames.contains("call"));
-            raiseBtn.setVisible(availableNames.contains("raise"));
-            foldBtn.setVisible(availableNames.contains("fold"));
-
-            raiseSlider.setVisible(availableNames.contains("raise"));
-            raiseAmountLabel.setVisible(availableNames.contains("raise"));
-
-            // Запускаем таймер на 30 секунд, чтобы скрыть кнопки
-            hideButtonsTask = Timer.schedule(new Timer.Task() {
-                @Override
-                public void run() {
-                    Gdx.app.postRunnable(() -> {
-                        checkBtn.setVisible(false);
-                        callBtn.setVisible(false);
-                        raiseBtn.setVisible(false);
-                        foldBtn.setVisible(false);
-                        raiseSlider.setVisible(false);
-                        raiseAmountLabel.setVisible(false);
-                    });
-                    hideButtonsTask = null;
-                }
-            }, 30); // 30 секунд
-        });
     }
+    private void updateActionButtons(Action[] availableActions) {
+        boolean canFold = false, canCall = false, canCheck = false, canRaise = false;
+
+        for (Action a : availableActions) {
+            switch (a.name.toLowerCase()) {
+                case "fold":  canFold = true; break;
+                case "call":  canCall = true; break;
+                case "check": canCheck = true; break;
+                case "raise": canRaise = true; break;
+            }
+        }
+
+        final boolean fCanFold = canFold;
+        final boolean fCanCall = canCall;
+        final boolean fCanCheck = canCheck;
+        final boolean fCanRaise = canRaise;
+
+        Gdx.app.postRunnable(() -> actionPanel.updateButtons(fCanFold, fCanCheck, fCanCall, fCanRaise));
+    }
+
 
 
 
     @Override
     public void onDisconnected() {
         Gdx.app.postRunnable(() ->
-            addChatMessage("Disconnected from server!")
+            chatPanel.addMessage("Disconnected from server!")
         );
     }
-
     @Override
     public void onTableCardsInfo(TableCardsInfo tableCardsInfo) {
         Gdx.app.postRunnable(() -> showTableCards(tableCardsInfo.getCards()));
     }
-
     @Override
     public void onPotUpdate(PotUpdate update) {
         animateAllBetsToPot(betMap);
         updatePot(update.getPotAmount());
     }
-
-    public void onChatMessage(ChatMessage object) {
+    @Override
+    public void onGameRestart() {
+    }
+    @Override
+    public void onPlayerOrderPacket(PlayerOrderPacket object) {
+        currentPlayers = object.logicalOrder;
         Gdx.app.postRunnable(() -> {
-            String name = object.getName();
-            String message = object.getMessage();
-
-            if ("sys".equals(name)) {
-                addChatMessage(message);
-            } else {
-                addChatMessage(name + ": " + message); // Белый текст
-            }
+            arrangePlayersOnTable(currentPlayers);
         });
     }
-
+    @Override
+    public void onBetUpdatePack(BetUpdatePack object) {
+        betMap = object.getBets();
+    }
     @Override
     public void onPlayerFold(FoldNotification notif) {
         Gdx.app.postRunnable(() -> {
@@ -552,11 +330,9 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 me.showHandCards(hand);            // показываем карты лицом
             }
 
-            addChatMessage("Your cards: " + hand);
+            chatPanel.addMessage("Your cards: " + hand);
         });
     }
-
-
 
     @Override
     public void onEndOfHandPacket(EndOfHandPacket packet) {
@@ -618,22 +394,89 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         });
     }
 
-    @Override
-    public void onGameRestart() {
+    private void arrangePlayersOnTable(List<String> logicalOrder) {
+        // Удаляем старые
+        for (PlayerActor pa : playerActorsById.values()) pa.remove();
+        playerActorsById.clear();
+
+        float worldW = stage.getViewport().getWorldWidth();
+        float worldH = stage.getViewport().getWorldHeight();
+
+        float centerX = worldW / 2f;
+        float centerY = worldH / 2f - worldH * 0.08f;
+
+        float a = worldW * 0.35f; // полуось по X (ширина стола)
+        float b = worldH * 0.30f; // полуось по Y (высота стола)
+
+        int total = logicalOrder.size();
+        int myIndex = logicalOrder.indexOf(client.getNickName());
+
+        // Сдвигаем список так, чтобы "я" был в начале
+        List<String> visualOrder = new ArrayList<>();
+        for (int i = 0; i < total; i++) {
+            visualOrder.add(logicalOrder.get((myIndex + i) % total));
+        }
+
+        // Список кол-ва игроков по сторонам: низ, право, верх, лево
+        int[] sectorCounts = new int[4];
+        if (total == 2) {
+            sectorCounts[0] = 1; sectorCounts[1] = 0; sectorCounts[2] = 1; sectorCounts[3] = 0;
+        } else if (total == 3) {
+            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 1; sectorCounts[3] = 0;
+        } else if (total == 4) {
+            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 1; sectorCounts[3] = 1;
+        } else if (total == 5) {
+            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 2; sectorCounts[3] = 1;
+        } else if (total == 6) {
+            sectorCounts[0] = 1; sectorCounts[1] = 2; sectorCounts[2] = 2; sectorCounts[3] = 1;
+        } else {
+            sectorCounts[0] = 2; sectorCounts[1] = 1; sectorCounts[2] = 2; sectorCounts[3] = 1;
+        }
+
+        int index = 0;
+        for (int side = 0; side < 4; side++) {
+            int count = sectorCounts[side];
+            for (int i = 0; i < count; i++) {
+                if (index >= visualOrder.size()) break;
+
+                String nick = visualOrder.get(index++);
+                int id = client.getIdByNickname(nick);
+                boolean amI = (id == myPlayerId);
+
+                PlayerActor pa = new PlayerActor(amI, id, nick,
+                    playerBalances.containsKey(nick) ? playerBalances.get(nick) : 0.0,
+                    avatarTexture, skin
+                );
+
+                float t = (i + 1f) / (count + 1f);
+                float x = centerX;
+                float y = centerY;
+
+                if (side == 0) { // низ
+                    x = centerX - a + 2 * a * t;
+                    y = centerY - b;
+                } else if (side == 1) { // право
+                    x = centerX + a;
+                    y = centerY - b + 2 * b * t;
+                } else if (side == 2) { // верх
+                    x = centerX + a - 2 * a * t;
+                    y = centerY + b;
+                } else if (side == 3) { // лево
+                    x = centerX - a;
+                    y = centerY + b - 2 * b * t;
+                }
+
+                x -= pa.getWidth() / 2f;
+                y -= pa.getHeight() * (side == 2 ? 0.6f : 0.2f);
+
+                pa.setPosition(x, y);
+                stage.addActor(pa);
+                playerActorsById.put(id, pa);
+            }
+        }
     }
 
-    @Override
-    public void onPlayerOrderPacket(PlayerOrderPacket object) {
-        currentPlayers = object.logicalOrder;
-        Gdx.app.postRunnable(() -> {
-            arrangePlayersOnTable(currentPlayers);
-        });
-    }
 
-    @Override
-    public void onBetUpdatePack(BetUpdatePack object) {
-        betMap = object.getBets();
-    }
 
 
     private void revealOpponentCards(Map<Integer, List<Card>> handsByPlayerId) {
@@ -668,7 +511,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         }
     }
 
-
     private void resetAllHighlights() {
         for (CardActor ca : tableCardActors) {
             ca.setHighlight(false);
@@ -680,6 +522,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             for (CardActor ca : pa.getCardActors()) ca.setHighlight(false);
         }
     }
+
     private void showWinnersSequentially(
         List<Integer> winnerIds,
         List<List<Card>> winningCardsByWinner,
@@ -802,7 +645,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             })
         ));
     }
-
     private void clearFloatingActors() {
         // Удаляем все transient-акторы
         for (Actor a : transientActors) {
@@ -830,6 +672,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         }
         transientActors.clear();
     }
+
     private void showTableCards(List<Card> tableCards) {
         tableCardActors.forEach(Actor::remove);
         tableCardActors.clear();
@@ -851,27 +694,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         }
     }
 
-    private void addChatMessage(String text) {
-        Label label;
-
-        // Стилизация сообщений: системные — серые, обычные — белые
-        if (text.startsWith("sys:")) {
-            label = new Label(text.substring(4), skin); // убираем "sys:" префикс
-            label.setColor(Color.DARK_GRAY);
-        } else {
-            label = new Label(text, skin);
-            label.setColor(Color.WHITE);
-        }
-
-        label.setWrap(true);
-        chatMessages.add(label).expandX().fillX();
-        chatMessages.row();
-
-        // Обновляем layout и скроллим вниз
-        chatMessages.pack();
-        chatScroll.layout();
-        chatScroll.setScrollPercentY(1f); // Прокрутка в самый низ
-    }
 
 
     public void updatePot(double potValue) {
@@ -904,7 +726,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             ));
         }
     }
-
 
 
 }

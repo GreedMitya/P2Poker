@@ -32,7 +32,7 @@ public class Network {
         kryo.register(LinkedList.class);
         kryo.register(Logger.class);
         kryo.register(JoinRequest.class);
-        kryo.register(JoinResponse.class);
+
         kryo.register(PlayerJoinedNotification.class);
         kryo.register(PlayerListUpdate.class);
         kryo.register(Poker.Game.PacketsClasses.Action[].class);

@@ -4,6 +4,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Card implements Comparable<Card>{
+
+
+
+    public static final Map<Suit, String> suitSymbols = new HashMap<>();
+    public static final Map<Card.Rank, String> rankSymbols = new HashMap<>();
     private Rank rank; // Ранг карты
     private Suit suit; // Ее Масть
 
@@ -16,11 +21,11 @@ public class Card implements Comparable<Card>{
     public Card(){
 
     }
+
     @Override
     public int hashCode() {
         return java.util.Objects.hash(rank, suit);
     }
-
 
     public Suit getSuit() {
         return suit;
@@ -29,14 +34,12 @@ public class Card implements Comparable<Card>{
         return rank;
     }
     // Делаем метод отображения карты через toString()
-    private static final Map<Suit, String> suitSymbols = new HashMap<>();
-    private static final Map<Card.Rank, String> rankSymbols = new HashMap<>();
 
     static {
-        suitSymbols.put(Card.Suit.Hearts, "♥️");
-        suitSymbols.put(Card.Suit.Diamonds, "♦️");
-        suitSymbols.put(Card.Suit.Clubs, "♣️");
-        suitSymbols.put(Card.Suit.Spades, "♠️");
+        suitSymbols.put(Card.Suit.Hearts, "H"); //Hearts
+        suitSymbols.put(Card.Suit.Diamonds, "D"); //Diamonds
+        suitSymbols.put(Card.Suit.Clubs, "C");//Clubs
+        suitSymbols.put(Card.Suit.Spades, "S");//Spades
 
         rankSymbols.put(Card.Rank.Ace, "A");
         rankSymbols.put(Card.Rank.King, "K");
@@ -57,7 +60,6 @@ public class Card implements Comparable<Card>{
     public String toString() {
         return rankSymbols.get(rank) + suitSymbols.get(suit);
     }
-
 
     public boolean equals(Object object) { // сравнение обьектов
         if (this == object) return true;

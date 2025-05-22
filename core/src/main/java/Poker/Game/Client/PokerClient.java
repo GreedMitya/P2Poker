@@ -1,11 +1,8 @@
 package Poker.Game.Client;
 
-import Poker.Game.ClientListener;
-import Poker.Game.LobbyScreen;
+import Poker.Game.*;
 import Poker.Game.PacketsClasses.*;
 
-import Poker.Game.PokerApp;
-import Poker.Game.WinnerScreen;
 import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.Client;
@@ -23,6 +20,7 @@ import static com.badlogic.gdx.Gdx.app;
  */
 public class PokerClient {
     private PokerApp pokerApp;
+    private ChatListener chatListener;
     private int clientId;
     private Client client;
     private ClientListener listener;
@@ -31,12 +29,15 @@ public class PokerClient {
     private final Map<Integer, String> idToNickname   = new HashMap<>();
     private final Map<String, Integer> nicknameToId   = new HashMap<>();
 
-    public PokerClient(PokerApp pokerApp) {
-        this.pokerApp = pokerApp;
+    public void onChatMessage(ChatListener listener) {
+        this.chatListener = listener;
     }
 
 
+    public PokerClient(PokerApp pokerApp) {
+        this.pokerApp = pokerApp;
 
+    }
     public void registerPlayer(int id, String nickname) {
         idToNickname.put(id, nickname);
         nicknameToId.put(nickname, id);
@@ -87,12 +88,9 @@ public class PokerClient {
             public void received(Connection connection, Object object) {
                 if (listener == null) return;
 
-                if (object instanceof JoinResponse) {
-                    listener.onJoinResponse((JoinResponse) object);
 
-                }else if (object instanceof PlayerListUpdate) {
+                else if (object instanceof PlayerListUpdate) {
                     PlayerListUpdate update = (PlayerListUpdate) object;
-
                     // Регистрируем всех игроков: nickname → id
                     for (Map.Entry<String, Integer> entry : update.getNicknames().entrySet()) {
                         String nickname = entry.getKey();
@@ -102,11 +100,13 @@ public class PokerClient {
                     listener.onPlayerListUpdate(update.getNicknamesOnly());
                 }
                 else if (object instanceof GameStartedNotification) {
-                    listener.onGameStarted((GameStartedNotification) object);
-                } else if (object instanceof CardInfo) {
+                    chatListener.onGameStarted((GameStartedNotification) object);
+                }else if(object instanceof PlayerJoinedNotification){
+                    chatListener.onPlayerJoinedNotification((PlayerJoinedNotification) object);
+                }else if (object instanceof CardInfo) {
                     listener.onCardInfo((CardInfo) object);
                 } else if (object instanceof GameStats) {
-                    listener.onGameStats((GameStats) object);
+                    chatListener.onGameStats((GameStats) object);
                 } else if (object instanceof BlindsNotification) {
                     listener.onBlinds((BlindsNotification) object);
                 } else if (object instanceof ActionRequest) {
@@ -118,10 +118,13 @@ public class PokerClient {
                     listener.onTableCardsInfo((TableCardsInfo) object);
                 } else if (object instanceof PlayerBetUpdate) {
                     listener.onPlayerBetUpdate((PlayerBetUpdate) object);
-                } else if (object instanceof ChatMessage) {
+                }else if (object instanceof ChatMessage) {
                     ChatMessage message = (ChatMessage) object;
-                    listener.onChatMessage(message);
-                } else if (object instanceof  PotUpdate) {
+                    if (chatListener != null) {
+                        chatListener.onChatMessage(message); // просто проксируем
+                    }
+                }
+                else if (object instanceof  PotUpdate) {
                     listener.onPotUpdate((PotUpdate) object);
                 }else if (object instanceof FoldNotification) {
                     listener.onPlayerFold((FoldNotification) object);
@@ -160,11 +163,8 @@ public class PokerClient {
         // Отправляем запрос на присоединение
         this.name = nickname;
         client.sendTCP(new JoinRequest(nickname));
-
     }
-
     // === Методы для UI / контроллера, вызываемые при клике на кнопки ===
-
     public void sendCheck(int playerId) {
         System.out.println("Отправляю действие: " + "Check" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();
@@ -234,8 +234,8 @@ public class PokerClient {
         return clientId;
     }
 
-    public void sendRestart(RestartGameRequest req) {
-        client.sendTCP(req);
+    public void sendRestart() {
+        client.sendTCP(new RestartGameRequest());
     }
     public void onWinnerPacket(WinnerPacket packet) {
         String winnerName = packet.getName();

@@ -29,6 +29,14 @@ public class CardActor extends Actor {
             faceDown = true;
         }
     }
+    public void setDimmed(boolean dimmed) {
+        if (dimmed) {
+            this.setColor(0.5f, 0.5f, 0.5f, 1f); // серый цвет
+        } else {
+            this.setColor(1f, 1f, 1f, 1f); // нормальный цвет
+        }
+    }
+
 
     // Новые методы для «переворота» карты
     public void showBack() {

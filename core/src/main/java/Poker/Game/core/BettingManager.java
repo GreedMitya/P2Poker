@@ -16,8 +16,8 @@ public class BettingManager {
     private PlayerManager playerManager;
     private double pot;
     private double currentBet;
-    private double smallBlind = 10;
-    private double bigBlind = 20;
+    private double smallBlind = 50;
+    private double bigBlind = 50;
     private int dealerIndex;
     private int smallBlindIndex;
     private int bigBlindIndex;
@@ -186,7 +186,7 @@ public class BettingManager {
 
                 if (player.isFolded() || player.isAllIn()) continue;
 
-                PlayerAction actionObj = getPlayerActionWithTimeout(player, 30);
+                PlayerAction actionObj = getPlayerActionWithTimeout(player, 1);
                 String action = actionObj.actionType.toLowerCase();
                 double raiseAmount = actionObj.amount;
 
