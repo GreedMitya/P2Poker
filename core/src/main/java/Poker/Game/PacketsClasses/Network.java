@@ -4,6 +4,8 @@ import Poker.Game.core.*;
 import com.esotericsoftware.kryo.Kryo;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class Network {
     public static void register(Kryo kryo) {
@@ -14,6 +16,8 @@ public class Network {
         kryo.register(List.class);
         kryo.register(Map.class);
         kryo.register(HashMap.class);
+        kryo.register(ConcurrentHashMap.class);
+        kryo.register(SpectatorJoinedNotification.class);
         kryo.register(EndOfHandPacket.class);
         kryo.register(PlayerOrderPacket.class);
         kryo.register(FoldNotification.class);
@@ -44,7 +48,6 @@ public class Network {
         kryo.register(Card.Suit.class);
         kryo.register(GameStartRequest.class);
         kryo.register(GameStartedNotification.class);
-        kryo.register(GameStats.class);
         kryo.register(BlindsNotification.class);
         kryo.register(StartGame.class);
         kryo.register(PokerGame.class);

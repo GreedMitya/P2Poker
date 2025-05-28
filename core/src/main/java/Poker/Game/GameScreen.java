@@ -130,9 +130,14 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             @Override public void onRestart() {
                 client.sendRestart();
             }
+
+            @Override
+            public void onDisconnect() {
+                client.disconnect();
+            }
         });
 
-        controlPanel.setPosition((5f)  * uiScale, (WORLD_HEIGHT-5) * uiScale); // например, левый нижний угол с отступом
+        controlPanel.setPosition((5f)  * uiScale, (WORLD_HEIGHT-25f) * uiScale); // например, левый нижний угол с отступом
         stage.addActor(controlPanel);
         actionPanel = new ActionPanel(skin, new ActionPanel.ActionListener() {
             @Override
@@ -193,13 +198,21 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void onPlayerListUpdate(List<String> nicknames) {
         this.currentPlayers = nicknames;
         setMyPlayerId(client.getMyId());
+
         Gdx.app.postRunnable(() -> {
+            // Убираем весь "первый" цикл и удаление старых здесь,
+            // оставляем только один rebuild:
+            // arrangePlayersOnTable(nicknames);
+
+            // Показываем кнопки хоста, если игроков >= 2
             if (isHost && nicknames.size() >= 2 && controlPanel != null) {
                 controlPanel.startBtn.setVisible(true);
                 controlPanel.restartBtn.setVisible(true);
             }
         });
     }
+
+
     @Override
     public void onPlayerBalanceUpdate(PlayerBalanceUpdate upd) {
         playerBalances.put(upd.name, upd.newBalance);
@@ -212,9 +225,14 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void onPlayerBetUpdate(PlayerBetUpdate upd) {
         Gdx.app.postRunnable(() -> {
             PlayerActor pa = playerActorsById.get(upd.playerId);
-            pa.showBet(upd.amount);
+            if (pa != null) {
+                pa.showBet(upd.amount);
+            } else {
+                Logger.Game("⚠️ [onPlayerBetUpdate] PlayerActor not found for id=" + upd.playerId + ". Возможно, игрок ещё не добавлен.");
+            }
         });
     }
+
     @Override
     public void onBlinds(BlindsNotification note) {
         Gdx.app.postRunnable(() -> {
@@ -300,12 +318,30 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     public void onGameRestart() {
     }
     @Override
-    public void onPlayerOrderPacket(PlayerOrderPacket object) {
-        currentPlayers = object.logicalOrder;
+    public void onPlayerOrderPacket(PlayerOrderPacket packet) {
+        this.currentPlayers = packet.getLogicalOrder();
+
+        // Запускаем на рендер-потоке
         Gdx.app.postRunnable(() -> {
+            // 1. Удаляем всех старых акторов за столом
+            for (PlayerActor pa : playerActorsById.values()) {
+                pa.remove();
+            }
+            playerActorsById.clear();
+
+            // 2. Класс arrangePlayersOnTable уже умеет добавлять по списку currentPlayers
             arrangePlayersOnTable(currentPlayers);
+
+            // 3. Сбрасываем UI прошлой раздачи (кнопки, карты)
+            actionPanel.hide();
+            for (PlayerActor pa : playerActorsById.values()) {
+                pa.clearHandCards();
+                pa.clearCardBacks();
+            }
         });
     }
+
+
     @Override
     public void onBetUpdatePack(BetUpdatePack object) {
         betMap = object.getBets();
@@ -332,6 +368,93 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
             chatPanel.addMessage("Your cards: " + hand);
         });
+    }
+
+    private void arrangePlayersOnTable(List<String> logicalOrder) {
+        // Удаляем старые
+        for (PlayerActor pa : playerActorsById.values()) pa.remove();
+        playerActorsById.clear();
+
+        float worldW = stage.getViewport().getWorldWidth();
+        float worldH = stage.getViewport().getWorldHeight();
+
+        float centerX = worldW / 2f;
+        float centerY = worldH / 2f - worldH * 0.08f;
+
+        float a = worldW * 0.35f; // полуось по X (ширина стола)
+        float b = worldH * 0.30f; // полуось по Y (высота стола)
+
+        int total = logicalOrder.size();
+        int myIndex = logicalOrder.indexOf(client.getNickName());
+
+        // Смещение "я" в visualOrder — только если 6 игроков, тогда я сижу справа внизу
+        int visualOffset = (total == 6) ? -1 : 0;
+        int shiftedIndex = (myIndex + visualOffset + total) % total;
+
+        // Сдвигаем список так, чтобы "я" оказался в нужной позиции
+        List<String> visualOrder = new ArrayList<>();
+        for (int i = 0; i < total; i++) {
+            visualOrder.add(logicalOrder.get((shiftedIndex + i) % total));
+        }
+
+
+        // Список кол-ва игроков по сторонам: низ, право, верх, лево
+        int[] sectorCounts = new int[4];
+        if (total == 2) {
+            sectorCounts[0] = 1; sectorCounts[1] = 0; sectorCounts[2] = 1; sectorCounts[3] = 0;
+        } else if (total == 3) {
+            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 1; sectorCounts[3] = 0;
+        } else if (total == 4) {
+            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 1; sectorCounts[3] = 1;
+        } else if (total == 5) {
+            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 2; sectorCounts[3] = 1;
+        } else if (total == 6) {
+            sectorCounts[0] = 2; sectorCounts[1] = 1; sectorCounts[2] = 2; sectorCounts[3] = 1;
+        } else {
+            sectorCounts[0] = 2; sectorCounts[1] = 1; sectorCounts[2] = 2; sectorCounts[3] = 1;
+        }
+
+        int index = 0;
+        for (int side = 0; side < 4; side++) {
+            int count = sectorCounts[side];
+            for (int i = 0; i < count; i++) {
+                if (index >= visualOrder.size()) break;
+
+                String nick = visualOrder.get(index++);
+                int id = client.getIdByNickname(nick);
+                boolean amI = (id == myPlayerId);
+
+                PlayerActor pa = new PlayerActor(amI, id, nick,
+                    playerBalances.containsKey(nick) ? playerBalances.get(nick) : 0.0,
+                    avatarTexture, skin
+                );
+
+                float t = (i + 1f) / (count + 1f);
+                float x = centerX;
+                float y = centerY;
+
+                if (side == 0) { // низ
+                    x = centerX - a + 2 * a * t;
+                    y = centerY - b;
+                } else if (side == 1) { // право
+                    x = centerX + a;
+                    y = centerY - b + 2 * b * t;
+                } else if (side == 2) { // верх
+                    x = centerX + a - 2 * a * t;
+                    y = centerY + b;
+                } else if (side == 3) { // лево
+                    x = centerX - a;
+                    y = centerY + b - 2 * b * t;
+                }
+
+                x -= pa.getWidth() / 2f;
+                y -= pa.getHeight() * (side == 2 ? 0.6f : 0.2f);
+
+                pa.setPosition(x, y);
+                stage.addActor(pa);
+                playerActorsById.put(id, pa);
+            }
+        }
     }
 
     @Override
@@ -383,7 +506,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                     for (PlayerActor playerActor : playerActorsById.values()) {
                         if (playerActor.isLocalPlayer()) {
                             // отправляем подтверждение
-                            System.out.println("GameScreen"+ "Отправляю ClientReadyForNextRound...");
+                            System.out.println("GameScreen"+ "ClientReadyForNextRound");
                             client.sendReadyForNextRound(playerActor.getPlayerId(), true);
                         }
                     }
@@ -392,88 +515,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             // 3) Запускаем на stage
             stage.addAction(fullSeq);
         });
-    }
-
-    private void arrangePlayersOnTable(List<String> logicalOrder) {
-        // Удаляем старые
-        for (PlayerActor pa : playerActorsById.values()) pa.remove();
-        playerActorsById.clear();
-
-        float worldW = stage.getViewport().getWorldWidth();
-        float worldH = stage.getViewport().getWorldHeight();
-
-        float centerX = worldW / 2f;
-        float centerY = worldH / 2f - worldH * 0.08f;
-
-        float a = worldW * 0.35f; // полуось по X (ширина стола)
-        float b = worldH * 0.30f; // полуось по Y (высота стола)
-
-        int total = logicalOrder.size();
-        int myIndex = logicalOrder.indexOf(client.getNickName());
-
-        // Сдвигаем список так, чтобы "я" был в начале
-        List<String> visualOrder = new ArrayList<>();
-        for (int i = 0; i < total; i++) {
-            visualOrder.add(logicalOrder.get((myIndex + i) % total));
-        }
-
-        // Список кол-ва игроков по сторонам: низ, право, верх, лево
-        int[] sectorCounts = new int[4];
-        if (total == 2) {
-            sectorCounts[0] = 1; sectorCounts[1] = 0; sectorCounts[2] = 1; sectorCounts[3] = 0;
-        } else if (total == 3) {
-            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 1; sectorCounts[3] = 0;
-        } else if (total == 4) {
-            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 1; sectorCounts[3] = 1;
-        } else if (total == 5) {
-            sectorCounts[0] = 1; sectorCounts[1] = 1; sectorCounts[2] = 2; sectorCounts[3] = 1;
-        } else if (total == 6) {
-            sectorCounts[0] = 1; sectorCounts[1] = 2; sectorCounts[2] = 2; sectorCounts[3] = 1;
-        } else {
-            sectorCounts[0] = 2; sectorCounts[1] = 1; sectorCounts[2] = 2; sectorCounts[3] = 1;
-        }
-
-        int index = 0;
-        for (int side = 0; side < 4; side++) {
-            int count = sectorCounts[side];
-            for (int i = 0; i < count; i++) {
-                if (index >= visualOrder.size()) break;
-
-                String nick = visualOrder.get(index++);
-                int id = client.getIdByNickname(nick);
-                boolean amI = (id == myPlayerId);
-
-                PlayerActor pa = new PlayerActor(amI, id, nick,
-                    playerBalances.containsKey(nick) ? playerBalances.get(nick) : 0.0,
-                    avatarTexture, skin
-                );
-
-                float t = (i + 1f) / (count + 1f);
-                float x = centerX;
-                float y = centerY;
-
-                if (side == 0) { // низ
-                    x = centerX - a + 2 * a * t;
-                    y = centerY - b;
-                } else if (side == 1) { // право
-                    x = centerX + a;
-                    y = centerY - b + 2 * b * t;
-                } else if (side == 2) { // верх
-                    x = centerX + a - 2 * a * t;
-                    y = centerY + b;
-                } else if (side == 3) { // лево
-                    x = centerX - a;
-                    y = centerY + b - 2 * b * t;
-                }
-
-                x -= pa.getWidth() / 2f;
-                y -= pa.getHeight() * (side == 2 ? 0.6f : 0.2f);
-
-                pa.setPosition(x, y);
-                stage.addActor(pa);
-                playerActorsById.put(id, pa);
-            }
-        }
     }
 
 

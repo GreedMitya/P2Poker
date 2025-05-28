@@ -114,8 +114,10 @@ public class BettingManager {
         bigBlindPlayer.setCurrentBetFromPlayers(bigBlind);
         playerBets.put(bigBlindPlayer, bigBlind);
 
-        BlindsNotification note = new BlindsNotification("Blinds: \n" + smallBlindPlayer.getName().toString() + " places small blind: " + smallBlind + "\n" + bigBlindPlayer.getName().toString() + " places big blind: " + bigBlind);
-        server.sendToAllTCP(note);
+        BlindsNotification note1 = new BlindsNotification(smallBlindPlayer.getName().toString() + " places small blind: " + smallBlind);
+        BlindsNotification note2 = new BlindsNotification(bigBlindPlayer.getName().toString() + " places big blind: " + bigBlind);
+        server.sendToAllTCP(note1);
+        server.sendToAllTCP(note2);
         server.sendToAllTCP(new PlayerBalanceUpdate(smallBlindPlayer.getName(), smallBlindPlayer.getBalance()));
         server.sendToAllTCP(new PlayerBalanceUpdate(bigBlindPlayer.getName(), bigBlindPlayer.getBalance()));
     }

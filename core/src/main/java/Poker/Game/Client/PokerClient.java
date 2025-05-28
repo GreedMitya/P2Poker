@@ -105,8 +105,6 @@ public class PokerClient {
                     chatListener.onPlayerJoinedNotification((PlayerJoinedNotification) object);
                 }else if (object instanceof CardInfo) {
                     listener.onCardInfo((CardInfo) object);
-                } else if (object instanceof GameStats) {
-                    chatListener.onGameStats((GameStats) object);
                 } else if (object instanceof BlindsNotification) {
                     listener.onBlinds((BlindsNotification) object);
                 } else if (object instanceof ActionRequest) {
@@ -123,8 +121,7 @@ public class PokerClient {
                     if (chatListener != null) {
                         chatListener.onChatMessage(message); // просто проксируем
                     }
-                }
-                else if (object instanceof  PotUpdate) {
+                }else if (object instanceof  PotUpdate) {
                     listener.onPotUpdate((PotUpdate) object);
                 }else if (object instanceof FoldNotification) {
                     listener.onPlayerFold((FoldNotification) object);
@@ -143,6 +140,9 @@ public class PokerClient {
                     });
                 }else if (object instanceof WinnerPacket){
                     onWinnerPacket((WinnerPacket) object);
+                }else if (object instanceof SpectatorJoinedNotification) {
+                    SpectatorJoinedNotification notif = (SpectatorJoinedNotification) object;
+                    sendChatMessage("Spectator joined: " + notif.nickname);
                 }
 
             }
@@ -165,6 +165,15 @@ public class PokerClient {
         client.sendTCP(new JoinRequest(nickname));
     }
     // === Методы для UI / контроллера, вызываемые при клике на кнопки ===
+    public void disconnect() {
+        if (client != null && client.isConnected()) {
+            idToNickname.clear();
+            nicknameToId.clear();
+            clientId = -1;
+            name = null;
+            client.close(); // Закрываем соединение (без ожидания)
+        }
+    }
     public void sendCheck(int playerId) {
         System.out.println("Отправляю действие: " + "Check" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();

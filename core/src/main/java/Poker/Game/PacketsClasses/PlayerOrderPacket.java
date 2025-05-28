@@ -9,5 +9,9 @@ public class PlayerOrderPacket {
         this.logicalOrder = logicalOrder;
     }
     public PlayerOrderPacket(){}
+
+    public List<String> getLogicalOrder() {
+        return logicalOrder;
+    }
 }
 

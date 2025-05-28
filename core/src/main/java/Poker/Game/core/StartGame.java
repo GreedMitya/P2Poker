@@ -21,7 +21,7 @@ public class StartGame {
         this.pokerServer = pokerServer;
         this.server = pokerServer.getServer();
     }
-    public void remove(int connectionID) {
+    public void removePlayer(int connectionID) {
         Player toRemove = null;
 
         for (Player p : players) {
@@ -46,20 +46,32 @@ public class StartGame {
 
 
     public void addPlayer(String nickname, int connectionID) {
-        Player newPlayer = new Player(nickname);
-        newPlayer.setServer(server);
-        newPlayer.setConnectionId(connectionID);// для связи по сети
-        players.add(newPlayer);
-        Logger.Game("Добавлен игрок: " + nickname);
-        PlayerBalanceUpdate upd = new PlayerBalanceUpdate();
-        upd.name = newPlayer.getName();
-        upd.newBalance = newPlayer.getBalance();
-        server.sendToAllTCP(upd);
+        synchronized (this) {
+            Player newPlayer = new Player(nickname);
+            newPlayer.setServer(server);
+            newPlayer.setConnectionId(connectionID);
+
+            players.add(newPlayer);
+            if (game != null && game.playerManager != null) {
+                game.playerManager.addPlayer(newPlayer);
+            }
+
+            Logger.Game("Добавлен игрок: " + nickname + (pokerServer.gameAlreadyStarted ? " (ожидает следующей раздачи)" : ""));
+
+            PlayerBalanceUpdate upd = new PlayerBalanceUpdate();
+            upd.name = newPlayer.getName();
+            upd.newBalance = newPlayer.getBalance();
+            server.sendToAllTCP(upd);
+        }
     }
+
+
 
     public void startGame() {
         if (players.size() >= 2) {
+            pokerServer.gameAlreadyStarted = true;
             game = new PokerGame(players);// ✅ сначала создаём игру
+            game.setStartGame(this);
             game.setPokerServer(pokerServer);
             game.setServer(server);
             game.bettingManager.setPokerServer(pokerServer);

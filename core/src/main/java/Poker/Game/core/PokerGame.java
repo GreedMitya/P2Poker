@@ -1,13 +1,11 @@
 package Poker.Game.core;
 
-import Poker.Game.PacketsClasses.EndOfHandPacket;
-import Poker.Game.PacketsClasses.GameStats;
-import Poker.Game.PacketsClasses.Logger;
+import Poker.Game.PacketsClasses.*;
 import Poker.Game.Server.PokerServer;
-import com.badlogic.gdx.Gdx;
 import com.esotericsoftware.kryonet.Server;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 // Main Game Manager Class
 public class PokerGame {
@@ -22,6 +20,9 @@ public class PokerGame {
     private List<Player> activePlayers;
     private BettingManager.BettingPhase bettingPhase;
     private PotManager potManager;
+
+    private StartGame startGame;
+
     public PokerGame(ArrayList<Player> players) {
         this.deck = new Deck();
         this.table = new Table(deck);
@@ -33,34 +34,50 @@ public class PokerGame {
     public PokerGame(){
 
     }
+
     public void setPokerServer(PokerServer pokerServer) {
         this.pokerServer = pokerServer;
     }
-
     public void startGame() {
         roundCounter = 0;
         startNextRound(); // только один вызов!
     }
 
     public void startNextRound() {
-        // Условие выхода (если остался 1 игрок)
+        synchronized(this) {
+            // Условие выхода (если остался 1 игрок)
             if (playerManager.getActivePlayers().size() <= 1) {
-                   String winner = playerManager.getActivePlayers().get(0).getName();
-                    Logger.Game("Game Over. Winner: " + winner);
-                    pokerServer.sendChatMessage("Game Over. Winner: " + winner);
-                    // Только отправляем на сервер shutdown-флоу:
+                String winner = playerManager.getActivePlayers().get(0).getName();
+                Logger.Game("Game Over. Winner: " + winner);
+                pokerServer.sendChatMessage("Game Over. Winner: " + winner);
+                // Только отправляем на сервер shutdown-флоу:
                 pokerServer.sendWinnerAndShutdown(winner);
                 return;
-                }
-        roundCounter++;
-        Logger.Game("\nStarting Round: " + roundCounter);
-        deck.shuffle();
-        Logger.Game("Active players: " + playerManager.getActivePlayers().size());
-
-        GameStats stats = new GameStats(roundCounter, playerManager.getActivePlayers().size());
-        server.sendToAllTCP(stats);
-        playRound(); // ключ к запуску!
+            }
+            roundCounter++;
+            Logger.Game("\nStarting Round: " + roundCounter);
+            deck.shuffle();
+            Logger.Game("Active players: " + playerManager.getActivePlayers().size());
+            pokerServer.sendChatMessage("Hand number: " + roundCounter + ";");
+            pokerServer.sendChatMessage("Active players: " + playerManager.getActivePlayers().size() + ";");
+            playRound(); // ключ к запуску!
+        }
     }
+
+    public void addWaitingPlayersToGame() {
+        Map<String, Integer> queue = pokerServer.getWaitingPlayers();
+        if (queue.isEmpty()) return;
+
+        List<Map.Entry<String,Integer>> toAdd = new ArrayList<>(queue.entrySet());
+        queue.clear();
+
+        for (Map.Entry<String, Integer> e : toAdd) {
+            Player p = new Player(e.getKey());
+            playerManager.addPlayer(p);
+            pokerServer.playerReadyStatus.put(e.getValue(), false);
+        }
+    }
+
     public void setServer(Server server) {
         this.server = server;
     }
@@ -70,6 +87,7 @@ public class PokerGame {
             player.setCurrentBetFromPlayers(0);
         }
     }
+
     private void playRound() {
         bettingManager.setBlinds();
         playerManager.prepareForRound(deck);
@@ -113,7 +131,6 @@ public class PokerGame {
 
         determineWinner();
     }
-
     private boolean isRoundComplete() {
         this.activePlayers = new ArrayList<>();
         for (Player player : playerManager.getActivePlayers()) {
@@ -231,6 +248,10 @@ public class PokerGame {
 
         // 4) Шлём всем клиентам
         server.sendToAllTCP(packet);
+    }
+
+    public void setStartGame(StartGame startGame) {
+        this.startGame = startGame;
     }
 
 

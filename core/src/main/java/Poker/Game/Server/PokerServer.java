@@ -14,25 +14,36 @@ import java.util.Set;
 import java.util.concurrent.*;
 
 public class PokerServer {
+    public volatile boolean gameAlreadyStarted = false;
+
+    protected final Map<String, Integer> waitingPlayers = new ConcurrentHashMap<>();
+
     private final Set<Integer> activeConnections = ConcurrentHashMap.newKeySet();
-    private final Map<Integer, Boolean> playerReadyStatus = new HashMap<>();
+
+    public final Map<Integer, Boolean> playerReadyStatus = new ConcurrentHashMap<>();
     private Server server;
+
     private StartGame startGame;
     private volatile boolean isShuttingDown = false;
     // Храним nickname по connectionId
-    private final Map<String,Integer> playerNicknames = new HashMap<>();
+    public final Map<String, Integer> playerNicknames = new ConcurrentHashMap<>();
     // pendingActions: ключ — connectionId игрока, значение — будущее выбранного действия
+
     private final Map<Integer, CompletableFuture<PlayerAction>> pendingActions = new ConcurrentHashMap<>();
 
-
+    private final ExecutorService joinExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "JoinExecutor");
+        t.setDaemon(true);
+        return t;
+    });
     // вместо Executors.newScheduledThreadPool(4);
+
     private final ScheduledExecutorService scheduler =
         Executors.newScheduledThreadPool(4, r -> {
             Thread t = new Thread(r);
             t.setDaemon(true);  // демон — не будет мешать JVM завершиться
             return t;
         });
-
 
     public void start() throws IOException {
         server = new Server();
@@ -50,10 +61,29 @@ public class PokerServer {
                 activeConnections.add(conn.getID());
             }
 
+
             @Override
             public void disconnected(Connection conn) {
+                int id = conn.getID();
+                Logger.server("connID=" + id + " disconnected.");
+                activeConnections.remove(id);
+                playerReadyStatus.remove(id);
+                pendingActions.remove(id);
 
+                // Удаляем никнейм по значению (через итерацию)
+                playerNicknames.entrySet().removeIf(entry -> entry.getValue().equals(id));
+                startGame.removePlayer(id);
+                server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
+
+                // ⛔ Если хост отключился — завершить сервер
+                if (id == 1) {
+                    Logger.server("⛔ Хост отключился! Сервер будет остановлен...");
+                    sendChatMessage("⛔ Хост покинул игру. Сервер завершает работу...");
+                    scheduler.schedule(PokerServer.this::shutdownServer, 2, TimeUnit.SECONDS); // 2 сек задержка для красоты
+                }
             }
+
+
 
 
 
@@ -65,16 +95,8 @@ public class PokerServer {
 
                 if (obj instanceof JoinRequest) {
                     JoinRequest req = (JoinRequest) obj;
-                    Logger.server("Player connected " + req.nickname);
-                    playerNicknames.put(req.nickname,conn.getID());
-
-                    Player player = new Player(req.nickname);
-                    startGame.addPlayer(player.getName(), conn.getID());
-
-                    server.sendToAllTCP(new PlayerJoinedNotification(req.nickname,conn.getID()));
-                    server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
-                    playerReadyStatus.put(conn.getID(), false);
-
+                    int connId = conn.getID();
+                    joinExecutor.submit(() -> handleJoin(req, connId));
                 } else if (obj instanceof ActionResponse) {
                     ActionResponse resp = (ActionResponse) obj;
                     Logger.server("📥 [RESP] от playerId=" + resp.playerId +
@@ -152,6 +174,22 @@ public class PokerServer {
 
         Logger.server("Сервер запущен и ждёт подключений...");
     }
+    private void handleJoin(JoinRequest req, int id) {
+        playerNicknames.put(req.nickname, id);
+        if (gameAlreadyStarted) {
+            waitingPlayers.put(req.nickname, id);
+            server.sendToAllTCP(new SpectatorJoinedNotification(req.nickname));
+            sendChatMessage(req.nickname + " connected. Will play from the next round!");
+            playerReadyStatus.put(id, false);
+            server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
+        } else {
+            Player player = new Player(req.nickname);
+            startGame.addPlayer(player.getName(), id);
+            server.sendToAllTCP(new PlayerJoinedNotification(req.nickname, id));
+            server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
+            playerReadyStatus.put(id, false);
+        }
+    }
 
     /**
      * Запрос хода у клиента.
@@ -189,6 +227,10 @@ public class PokerServer {
         }, timeoutSec, TimeUnit.SECONDS);
 
         return future;
+    }
+
+    public Map<String, Integer> getWaitingPlayers() {
+        return waitingPlayers;
     }
 
     public void sendChatMessage(String text) {
@@ -234,6 +276,7 @@ public class PokerServer {
     private void startNextRound() {
         // Логика для начала нового раунда
         System.out.println("Все игроки готовы. Начинаем новый раунд!");
+        startGame.getGame().playerManager.reloadActivePlayersList(); // 🔁 освежаем активных игроков
         startGame.getGame().resetBets();
         startGame.getGame().endRound();
         startGame.getGame().startNextRound();
@@ -277,7 +320,4 @@ public class PokerServer {
         server.stop();
 
     }
-
-
-
 }
