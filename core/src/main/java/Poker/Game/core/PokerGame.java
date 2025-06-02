@@ -63,21 +63,6 @@ public class PokerGame {
             playRound(); // ключ к запуску!
         }
     }
-
-    public void addWaitingPlayersToGame() {
-        Map<String, Integer> queue = pokerServer.getWaitingPlayers();
-        if (queue.isEmpty()) return;
-
-        List<Map.Entry<String,Integer>> toAdd = new ArrayList<>(queue.entrySet());
-        queue.clear();
-
-        for (Map.Entry<String, Integer> e : toAdd) {
-            Player p = new Player(e.getKey());
-            playerManager.addPlayer(p);
-            pokerServer.playerReadyStatus.put(e.getValue(), false);
-        }
-    }
-
     public void setServer(Server server) {
         this.server = server;
     }

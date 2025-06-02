@@ -47,14 +47,23 @@ public class StartGame {
 
     public void addPlayer(String nickname, int connectionID) {
         synchronized (this) {
+            // Проверка дубликатов
+            for (Player p : players) {
+                if (p.getConnectionId() == connectionID) {
+                    Logger.Game("Игрок с connectionID " + connectionID + " уже добавлен, пропускаем.");
+                    return;
+                }
+                if (p.getName().equals(nickname)) {
+                    Logger.Game("Игрок с ником " + nickname + " уже добавлен, пропускаем.");
+                    return;
+                }
+            }
+            // Если прошло проверку — добавляем
             Player newPlayer = new Player(nickname);
             newPlayer.setServer(server);
             newPlayer.setConnectionId(connectionID);
 
             players.add(newPlayer);
-            if (game != null && game.playerManager != null) {
-                game.playerManager.addPlayer(newPlayer);
-            }
 
             Logger.Game("Добавлен игрок: " + nickname + (pokerServer.gameAlreadyStarted ? " (ожидает следующей раздачи)" : ""));
 

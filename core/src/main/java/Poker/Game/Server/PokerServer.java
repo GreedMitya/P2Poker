@@ -8,7 +8,6 @@ import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -174,22 +173,31 @@ public class PokerServer {
 
         Logger.server("Сервер запущен и ждёт подключений...");
     }
+    private boolean isNicknameTaken(String nickname) {
+        return playerNicknames.containsKey(nickname) || waitingPlayers.containsKey(nickname);
+    }
+
     private void handleJoin(JoinRequest req, int id) {
-        playerNicknames.put(req.nickname, id);
-        if (gameAlreadyStarted) {
-            waitingPlayers.put(req.nickname, id);
-            server.sendToAllTCP(new SpectatorJoinedNotification(req.nickname));
-            sendChatMessage(req.nickname + " connected. Will play from the next round!");
-            playerReadyStatus.put(id, false);
-            server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
-        } else {
-            Player player = new Player(req.nickname);
-            startGame.addPlayer(player.getName(), id);
-            server.sendToAllTCP(new PlayerJoinedNotification(req.nickname, id));
-            server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
-            playerReadyStatus.put(id, false);
+        synchronized(this) {
+            if (isNicknameTaken(req.nickname)) {
+                sendChatMessage("Ник " + req.nickname + " уже занят!");
+                return;
+            }
+            playerNicknames.put(req.nickname, id);
+            playerReadyStatus.put(id, true);
+
+            if (gameAlreadyStarted) {
+                waitingPlayers.put(req.nickname, id);
+                sendChatMessage(req.nickname + " connected! Will play from next round!");
+            } else {
+                Player player = new Player(req.nickname);
+                startGame.addPlayer(player.getName(), id);
+                server.sendToAllTCP(new PlayerJoinedNotification(req.nickname, id));
+                server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
+            }
         }
     }
+
 
     /**
      * Запрос хода у клиента.
@@ -260,7 +268,7 @@ public class PokerServer {
             scheduler.schedule(() -> {
                 Logger.server("⏱ 1 секунда истекла – начинаем новый раунд");
                 startNextRound();
-            }, 1, TimeUnit.SECONDS);
+            }, 2, TimeUnit.SECONDS);
         }
     }
 
@@ -274,13 +282,33 @@ public class PokerServer {
         return true;
     }
     private void startNextRound() {
-        // Логика для начала нового раунда
+        // Перед стартом нового раунда:
+        for (Map.Entry<String, Integer> entry : waitingPlayers.entrySet()) {
+            String nickname = entry.getKey();
+            int connectionID = entry.getValue();
+            // Проверить, нет ли такого игрока в active players
+            boolean alreadyExists = false;
+            for (Player p : startGame.getPlayers()) {
+                if (p.getName().equals(nickname)) {
+                    alreadyExists = true;
+                    break;
+                }
+            }
+            if (!alreadyExists) {
+                startGame.addPlayer(nickname, connectionID);
+                startGame.getGame().playerManager.reloadActivePlayersList();
+            }
+        }
+        waitingPlayers.clear();
+        server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
+        // 🔄 Очищаем список ожидающих
+        // ✅ Обновляем списки для клиентов уже после добавления новых игроков
         System.out.println("Все игроки готовы. Начинаем новый раунд!");
-        startGame.getGame().playerManager.reloadActivePlayersList(); // 🔁 освежаем активных игроков
         startGame.getGame().resetBets();
         startGame.getGame().endRound();
         startGame.getGame().startNextRound();
     }
+
 
     public void sendWinnerAndShutdown(String winnerName) {
         if (isShuttingDown) return;
@@ -300,11 +328,7 @@ public class PokerServer {
 
         }, 5, TimeUnit.SECONDS);
     }
-
-// Удаляем старый sendWinner(!) и в core-коде вызываем именно sendWinnerAndShutdown(...)
-
-
-
+    // Удаляем старый sendWinner(!) и в core-коде вызываем именно sendWinnerAndShutdown(...)
     public void shutdownServer() {
         System.out.println("[SERVER] Shutting down...");
         BroadcastResponder.stopListening();

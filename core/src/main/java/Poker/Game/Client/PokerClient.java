@@ -142,7 +142,7 @@ public class PokerClient {
                     onWinnerPacket((WinnerPacket) object);
                 }else if (object instanceof SpectatorJoinedNotification) {
                     SpectatorJoinedNotification notif = (SpectatorJoinedNotification) object;
-                    sendChatMessage("Spectator joined: " + notif.nickname);
+
                 }
 
             }

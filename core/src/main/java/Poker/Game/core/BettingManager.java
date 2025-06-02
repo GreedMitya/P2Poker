@@ -103,8 +103,6 @@ public class BettingManager {
         PlayerOrderPacket orderPacket = new PlayerOrderPacket(logicalOrder);
         server.sendToAllTCP(orderPacket);
 
-
-
         smallBlindPlayer.decreaseBalance(smallBlind);
         smallBlindPlayer.setCurrentBetFromPlayers(smallBlind);
         playerBets.put(smallBlindPlayer, smallBlind);

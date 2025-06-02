@@ -200,9 +200,9 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         setMyPlayerId(client.getMyId());
 
         Gdx.app.postRunnable(() -> {
-            // Убираем весь "первый" цикл и удаление старых здесь,
-            // оставляем только один rebuild:
-            // arrangePlayersOnTable(nicknames);
+            // Не перестраиваем здесь, но можно добавить новых игроков,
+            // если их еще нет в playerActorsById
+            arrangePlayersOnTable(currentPlayers);
 
             // Показываем кнопки хоста, если игроков >= 2
             if (isHost && nicknames.size() >= 2 && controlPanel != null) {
@@ -212,7 +212,28 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         });
     }
 
+    @Override
+    public void onPlayerOrderPacket(PlayerOrderPacket packet) {
+        this.currentPlayers = packet.getLogicalOrder();
 
+        // Запускаем на рендер-потоке
+        Gdx.app.postRunnable(() -> {
+            // 1. Удаляем всех старых акторов за столом
+            for (PlayerActor pa : playerActorsById.values()) {
+                pa.remove();
+            }
+            playerActorsById.clear();
+            // 2. Класс arrangePlayersOnTable уже умеет добавлять по списку currentPlayers
+            arrangePlayersOnTable(currentPlayers);
+
+            // 3. Сбрасываем UI прошлой раздачи (кнопки, карты)
+            actionPanel.hide();
+            for (PlayerActor pa : playerActorsById.values()) {
+                pa.clearHandCards();
+                pa.clearCardBacks();
+            }
+        });
+    }
     @Override
     public void onPlayerBalanceUpdate(PlayerBalanceUpdate upd) {
         playerBalances.put(upd.name, upd.newBalance);
@@ -221,6 +242,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             if (pa != null) pa.updateBalance(upd.newBalance);
         });
     }
+
     @Override
     public void onPlayerBetUpdate(PlayerBetUpdate upd) {
         Gdx.app.postRunnable(() -> {
@@ -232,7 +254,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             }
         });
     }
-
     @Override
     public void onBlinds(BlindsNotification note) {
         Gdx.app.postRunnable(() -> {
@@ -276,6 +297,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         }, 30); // через 30 секунд
 
     }
+
     private void updateActionButtons(Action[] availableActions) {
         boolean canFold = false, canCall = false, canCheck = false, canRaise = false;
 
@@ -298,7 +320,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
 
 
-
     @Override
     public void onDisconnected() {
         Gdx.app.postRunnable(() ->
@@ -316,29 +337,6 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     }
     @Override
     public void onGameRestart() {
-    }
-    @Override
-    public void onPlayerOrderPacket(PlayerOrderPacket packet) {
-        this.currentPlayers = packet.getLogicalOrder();
-
-        // Запускаем на рендер-потоке
-        Gdx.app.postRunnable(() -> {
-            // 1. Удаляем всех старых акторов за столом
-            for (PlayerActor pa : playerActorsById.values()) {
-                pa.remove();
-            }
-            playerActorsById.clear();
-
-            // 2. Класс arrangePlayersOnTable уже умеет добавлять по списку currentPlayers
-            arrangePlayersOnTable(currentPlayers);
-
-            // 3. Сбрасываем UI прошлой раздачи (кнопки, карты)
-            actionPanel.hide();
-            for (PlayerActor pa : playerActorsById.values()) {
-                pa.clearHandCards();
-                pa.clearCardBacks();
-            }
-        });
     }
 
 
