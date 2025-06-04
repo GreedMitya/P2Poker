@@ -67,9 +67,9 @@ public class CardActor extends Actor {
     public void setHighlight(boolean highlight) {
         this.highlighted = highlight;
         if (highlight) {
-            this.setColor(Color.WHITE);
+            this.setColor(Color.GOLD);
         } else {
-            this.setColor(Color.GRAY);
+            this.setColor(Color.WHITE);
         }
     }
 

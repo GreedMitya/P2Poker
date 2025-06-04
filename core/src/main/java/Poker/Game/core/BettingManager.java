@@ -82,6 +82,7 @@ public class BettingManager {
         smallBlindIndex = (dealerIndex + 1) % size;
         bigBlindIndex = (dealerIndex + 2) % size;
 
+        Player dealerPlayer = activePlayers.get(dealerIndex);
         Player smallBlindPlayer = activePlayers.get(smallBlindIndex);
         Player bigBlindPlayer = activePlayers.get(bigBlindIndex);
 
@@ -111,11 +112,14 @@ public class BettingManager {
         bigBlindPlayer.decreaseBalance(bigBlind);
         bigBlindPlayer.setCurrentBetFromPlayers(bigBlind);
         playerBets.put(bigBlindPlayer, bigBlind);
+        List<String> messages = new ArrayList<>();
 
-        BlindsNotification note1 = new BlindsNotification(smallBlindPlayer.getName().toString() + " places small blind: " + smallBlind);
-        BlindsNotification note2 = new BlindsNotification(bigBlindPlayer.getName().toString() + " places big blind: " + bigBlind);
-        server.sendToAllTCP(note1);
-        server.sendToAllTCP(note2);
+        messages.add(smallBlindPlayer.getName() + " places small blind: " + smallBlind);
+        messages.add(bigBlindPlayer.getName() + " places big blind: " + bigBlind);
+        // Отправим одним пакетом
+        BlindsNotification blindsNotification = new BlindsNotification(messages, dealerPlayer.getConnectionId());
+        server.sendToAllTCP(blindsNotification);
+
         server.sendToAllTCP(new PlayerBalanceUpdate(smallBlindPlayer.getName(), smallBlindPlayer.getBalance()));
         server.sendToAllTCP(new PlayerBalanceUpdate(bigBlindPlayer.getName(), bigBlindPlayer.getBalance()));
     }

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PlayerActor extends WidgetGroup {
+    private int tableSide = -1;
     private final float avatarSize   = 64f  * UIScale.ui;
     private final float cardWidth    = 60f  * UIScale.ui;
     private final float cardHeight   = 82f  * UIScale.ui;
@@ -28,6 +29,8 @@ public class PlayerActor extends WidgetGroup {
     private final boolean isLocalPlayer;
     private final int playerId;
     private double currentBetAmount = 0;
+    private Image dealerButton;
+
 
     public double getCurrentBetAmount() {
         return currentBetAmount;
@@ -105,7 +108,59 @@ public class PlayerActor extends WidgetGroup {
             float labelY = avatarY + avatarH/2f - betLabel.getHeight()/2f;
             betLabel.setPosition(labelX, labelY);
         }
+
+        if (dealerButton != null) {
+            float x = 0, y = 0;
+            float margin = 8f;
+
+            switch (tableSide) {
+                case 0: // низ
+                    x = avatarX - avatarW - dealerButton.getWidth() / 2f;
+                    y = avatarY + 2*dealerButton.getHeight() + 2*margin;
+                    break;
+                case 1: // право
+                    x = avatarX - avatarW - margin;
+                    y = avatarY + avatarH / 2f - dealerButton.getHeight() / 2f;
+                    break;
+                case 2: // верх
+                    x = avatarX - avatarW/2 - dealerButton.getWidth() / 2f;
+                    y = avatarY - avatarH/2;
+                    break;
+                case 3: // лево
+                    x = avatarX + 2*dealerButton.getWidth() + 2*margin;
+                    y = avatarY - avatarH/2f;
+                    break;
+                default:
+                    x = avatarX + avatarW - dealerButton.getWidth() / 2f;
+                    y = avatarY + avatarH - dealerButton.getHeight() / 2f;
+            }
+
+            dealerButton.setPosition(x, y);
+        }
     }
+
+    public void setTableSide(int side) {
+        this.tableSide = side;
+    }
+
+    public int getTableSide() {
+        return tableSide;
+    }
+    public void setDealer(boolean isDealer) {
+        if (isDealer) {
+            if (dealerButton == null) {
+                Texture dealerTexture = new Texture("sgx/raw/DealerButton.png"); // или из скина
+                dealerButton = new Image(dealerTexture);
+                dealerButton.setSize(44f * UIScale.ui, 36f * UIScale.ui);
+                addActor(dealerButton);
+            }
+        } else if (dealerButton != null) {
+            dealerButton.remove();
+            dealerButton = null;
+        }
+        invalidate();
+    }
+
 
     public void showHandCards(List<Card> hand) {
         clearHandCards();

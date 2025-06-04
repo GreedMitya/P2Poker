@@ -257,15 +257,24 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     @Override
     public void onBlinds(BlindsNotification note) {
         Gdx.app.postRunnable(() -> {
-            chatPanel.addMessage(note.getSmallBlind());
+            // Каждое сообщение отдельно в чат
+            for (String msg : note.getMessages()) {
+                chatPanel.addMessage(msg);
+            }
+
             potLabel.setVisible(true);
-            for (PlayerActor playerActor : playerActorsById.values()) {
-                if (!playerActor.isLocalPlayer()) {
-                    playerActor.showCardBacks();
+
+            for (PlayerActor actor : playerActorsById.values()) {
+                if (!actor.isLocalPlayer()) {
+                    actor.showCardBacks();
                 }
+
+                actor.setDealer(actor.getPlayerId() == note.getDealerId());
             }
         });
     }
+
+
     @Override
     public void onActionRequest(ActionRequest req) {
         System.out.println("onActionRequest called for player: " + req.playerId);
@@ -448,6 +457,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 x -= pa.getWidth() / 2f;
                 y -= pa.getHeight() * (side == 2 ? 0.6f : 0.2f);
 
+                pa.setTableSide(side); // Добавь сюда
                 pa.setPosition(x, y);
                 stage.addActor(pa);
                 playerActorsById.put(id, pa);
