@@ -14,6 +14,13 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Enumeration;
+
+import static Poker.Game.Server.PokerServer.getLocalIpAddress;
 
 public class LobbyScreen implements Screen {
     private final PokerApp app;
@@ -38,9 +45,21 @@ public class LobbyScreen implements Screen {
         // Создаем виджеты
         final TextField nickField = new TextField("", skin);
         nickField.setMessageText("Your name: ");
+        nickField.setTextFieldListener((field, key) -> {
+            if (key == '\n' || key == '\r') {
+                field.getOnscreenKeyboard().show(false); // Скрываем клавиатуру
+                stage.setKeyboardFocus(null);            // Убираем фокус с поля
+            }
+        });
 
         final TextField ipField = new TextField("", skin);
         ipField.setMessageText("IP host: ");
+        ipField.setTextFieldListener((field, key) -> {
+            if (key == '\n' || key == '\r') {
+                field.getOnscreenKeyboard().show(false);
+                stage.setKeyboardFocus(null);
+            }
+        });
 
         TextButton hostBtn = new TextButton("Host", skin);
         TextButton joinBtn = new TextButton("Connect", skin);
@@ -49,7 +68,8 @@ public class LobbyScreen implements Screen {
         hostBtn.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                startGame(true, "localhost", nickField.getText().trim());
+                String localIp = getLocalIpAddress();
+                startGame(true, localIp, nickField.getText().trim());
             }
         });
 

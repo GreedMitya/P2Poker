@@ -7,7 +7,9 @@ import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 import java.io.IOException;
+import java.net.*;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -96,6 +98,10 @@ public class PokerServer {
                     JoinRequest req = (JoinRequest) obj;
                     int connId = conn.getID();
                     joinExecutor.submit(() -> handleJoin(req, connId));
+                    if(connId==1){
+                        sendChatMessage("Server ip: " + getLocalIpAddress());
+                        sendChatMessage("Ports: 54555/54777");
+                    }
                 } else if (obj instanceof ActionResponse) {
                     ActionResponse resp = (ActionResponse) obj;
                     Logger.server("📥 [RESP] от playerId=" + resp.playerId +
@@ -176,6 +182,32 @@ public class PokerServer {
     private boolean isNicknameTaken(String nickname) {
         return playerNicknames.containsKey(nickname) || waitingPlayers.containsKey(nickname);
     }
+    public static String getLocalIpAddress() {
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
+                NetworkInterface intf = en.nextElement();
+
+                // Пропускаем loopback и неактивные
+                if (intf.isLoopback() || !intf.isUp()) continue;
+
+                for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
+                    InetAddress inetAddress = enumIpAddr.nextElement();
+
+                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
+                        String ip = inetAddress.getHostAddress();
+                        // Фильтрация виртуальных/мобильных
+                        if (!ip.startsWith("127.") && !ip.startsWith("0.")) {
+                            return ip;
+                        }
+                    }
+                }
+            }
+        } catch (SocketException ex) {
+            ex.printStackTrace();
+        }
+        return "Unknown";
+    }
+
 
     private void handleJoin(JoinRequest req, int id) {
         synchronized(this) {
