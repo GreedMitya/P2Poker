@@ -1,4 +1,6 @@
-package Poker.Game.PacketsClasses;
+package Poker.Game.Server;
+
+import Poker.Game.PacketsClasses.Logger;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;

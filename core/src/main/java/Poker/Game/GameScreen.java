@@ -16,9 +16,8 @@ import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.actions.SequenceAction;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.utils.ScreenUtils;
-import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.Timer;
-
+import com.badlogic.gdx.utils.viewport.StretchViewport;
 
 
 import java.util.*;
@@ -52,6 +51,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     // === UI: кнопки, слайдер, лейблы, чат ===
     private ControlPanel controlPanel;
     private Label     raiseAmountLabel, potLabel;
+    private boolean startButtonShown = false;
+
     // === Для управления потоком действий ===
     private int    currentPlayerId;
     private Action[] currentActions;
@@ -90,7 +91,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         CardTextureManager.load();
         // Сцена и фон
         avatarTexture = new Texture(Gdx.files.internal("sgx/raw/defaulrAvatar.png"));
-        FitViewport viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT);
+        //FitViewport viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT);
+        StretchViewport viewport = new StretchViewport(WORLD_WIDTH, WORLD_HEIGHT);
         stage = new Stage(viewport);
         Gdx.input.setInputProcessor(stage);
         cardWidth  = UIConfig.CARD_BASE_WIDTH  * UIScale.ui;
@@ -200,17 +202,20 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         setMyPlayerId(client.getMyId());
 
         Gdx.app.postRunnable(() -> {
-            // Не перестраиваем здесь, но можно добавить новых игроков,
-            // если их еще нет в playerActorsById
             arrangePlayersOnTable(currentPlayers);
 
-            // Показываем кнопки хоста, если игроков >= 2
-            if (isHost && nicknames.size() >= 2 && controlPanel != null) {
+            // Показываем кнопки Хоста лишь один раз,
+            // когда игроков стало 2 или больше
+            if (isHost
+                && nicknames.size() >= 2
+                && controlPanel != null
+                && !startButtonShown) {
                 controlPanel.startBtn.setVisible(true);
-                controlPanel.restartBtn.setVisible(true);
+                startButtonShown = true;
             }
         });
     }
+
 
     @Override
     public void onPlayerOrderPacket(PlayerOrderPacket packet) {
@@ -249,6 +254,9 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             PlayerActor pa = playerActorsById.get(upd.playerId);
             if (pa != null) {
                 pa.showBet(upd.amount);
+                if (upd.amount>0){
+                    SoundManager.getInstance().play("bet", 1f);
+                }
             } else {
                 Logger.Game("⚠️ [onPlayerBetUpdate] PlayerActor not found for id=" + upd.playerId + ". Возможно, игрок ещё не добавлен.");
             }
@@ -309,13 +317,26 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
     private void updateActionButtons(Action[] availableActions) {
         boolean canFold = false, canCall = false, canCheck = false, canRaise = false;
+        int minRaise = 20;
+        int maxRaise = 1000;
 
         for (Action a : availableActions) {
             switch (a.name.toLowerCase()) {
-                case "fold":  canFold = true; break;
-                case "call":  canCall = true; break;
-                case "check": canCheck = true; break;
-                case "raise": canRaise = true; break;
+                case "fold":
+                    canFold = true;
+                    break;
+                case "call":
+                    canCall = true;
+                    break;
+                case "check":
+                    canCheck = true;
+                    break;
+                case "raise":
+                    canRaise = true;
+                    // Сохраняем min/max из объекта Action
+                    minRaise = (int) Math.round(a.min);
+                    maxRaise = (int) Math.round(a.max);
+                    break;
             }
         }
 
@@ -323,9 +344,14 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         final boolean fCanCall = canCall;
         final boolean fCanCheck = canCheck;
         final boolean fCanRaise = canRaise;
+        final int fMinRaise = minRaise;
+        final int fMaxRaise = maxRaise;
 
-        Gdx.app.postRunnable(() -> actionPanel.updateButtons(fCanFold, fCanCheck, fCanCall, fCanRaise));
+        Gdx.app.postRunnable(() -> actionPanel.updateButtons(
+            fCanFold, fCanCheck, fCanCall, fCanRaise, fMinRaise, fMaxRaise
+        ));
     }
+
 
 
 
@@ -338,6 +364,14 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     @Override
     public void onTableCardsInfo(TableCardsInfo tableCardsInfo) {
         Gdx.app.postRunnable(() -> showTableCards(tableCardsInfo.getCards()));
+        if (tableCardsInfo.getCards().size()==3) {
+            SoundManager.getInstance().play("flipontable", 1f);
+            SoundManager.getInstance().play("flipontable", 1f);
+            SoundManager.getInstance().play("flipontable", 1f);
+        }
+        else {
+            SoundManager.getInstance().play("flipontable", 1f);
+        }
     }
     @Override
     public void onPotUpdate(PotUpdate update) {
@@ -359,6 +393,11 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
             PlayerActor pa = playerActorsById.get(notif.playerId);
             if (pa != null) pa.clearCardBacks();
         });
+        SoundManager.getInstance().play("fold", 1f);
+    }
+    @Override
+    public void onCheckPacket() {
+        SoundManager.getInstance().play("check", 1f);
     }
 
     @Override
@@ -375,6 +414,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
             chatPanel.addMessage("Your cards: " + hand);
         });
+        SoundManager.getInstance().play("flipcard", 1f);
     }
 
     private void arrangePlayersOnTable(List<String> logicalOrder) {
@@ -667,6 +707,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                 })
             ));
         }
+        SoundManager.getInstance().play("totalpot1", 0.5f);
     }
 
     private void showWinningComboText(PlayerActor player, String comboName) {
@@ -749,6 +790,9 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         Gdx.app.postRunnable(() -> {
             if (potLabel != null) {
                 potLabel.setText("Pot: " + potValue + "$");
+                if (potValue>30) {
+                    SoundManager.getInstance().play("totalpot1", 1f);
+                }
             }
         });
     }

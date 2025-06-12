@@ -15,36 +15,33 @@ import java.util.Set;
 import java.util.concurrent.*;
 
 public class PokerServer {
+    private static PokerServer instance;
     public volatile boolean gameAlreadyStarted = false;
-
     protected final Map<String, Integer> waitingPlayers = new ConcurrentHashMap<>();
 
     private final Set<Integer> activeConnections = ConcurrentHashMap.newKeySet();
 
     public final Map<Integer, Boolean> playerReadyStatus = new ConcurrentHashMap<>();
-    private Server server;
 
+    private Server server;
     private StartGame startGame;
     private volatile boolean isShuttingDown = false;
     // Храним nickname по connectionId
     public final Map<String, Integer> playerNicknames = new ConcurrentHashMap<>();
     // pendingActions: ключ — connectionId игрока, значение — будущее выбранного действия
-
     private final Map<Integer, CompletableFuture<PlayerAction>> pendingActions = new ConcurrentHashMap<>();
 
-    private final ExecutorService joinExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "JoinExecutor");
-        t.setDaemon(true);
-        return t;
-    });
     // вместо Executors.newScheduledThreadPool(4);
-
     private final ScheduledExecutorService scheduler =
         Executors.newScheduledThreadPool(4, r -> {
             Thread t = new Thread(r);
             t.setDaemon(true);  // демон — не будет мешать JVM завершиться
             return t;
         });
+
+    public PokerServer() {
+        instance = this;
+    }
 
     public void start() throws IOException {
         server = new Server();
@@ -80,7 +77,7 @@ public class PokerServer {
                 if (id == 1) {
                     Logger.server("⛔ Хост отключился! Сервер будет остановлен...");
                     sendChatMessage("⛔ Хост покинул игру. Сервер завершает работу...");
-                    scheduler.schedule(PokerServer.this::shutdownServer, 2, TimeUnit.SECONDS); // 2 сек задержка для красоты
+                    shutdownServer();// 2 сек задержка для красоты
                 }
             }
 
@@ -97,7 +94,7 @@ public class PokerServer {
                 if (obj instanceof JoinRequest) {
                     JoinRequest req = (JoinRequest) obj;
                     int connId = conn.getID();
-                    joinExecutor.submit(() -> handleJoin(req, connId));
+                    handleJoin(req, connId);
                     if(connId==1){
                         sendChatMessage("Server ip: " + getLocalIpAddress());
                         sendChatMessage("Ports: 54555/54777");
@@ -161,12 +158,12 @@ public class PokerServer {
             }
         });
 
-        server.bind(54555, 54777);// выбирайте ваши порты
+        bindWithRetry(54555, 54777);// выбирайте ваши порты
         server.start();
 
 
         // KeepAlive-пинг всем клиентам
-        scheduler.scheduleAtFixedRate(() -> {
+        scheduler.scheduleWithFixedDelay(() -> {
             for (Connection conn : server.getConnections()) {
                 conn.sendTCP(new KeepAlive());
             }
@@ -178,6 +175,38 @@ public class PokerServer {
         startGame.setServer(this);
 
         Logger.server("Сервер запущен и ждёт подключений...");
+    }
+    private void bindWithRetry(int tcpPort, int udpPort) throws IOException {
+        int attempts = 0;
+        final int maxAttempts = 5;
+        final long delayMs = 200;
+
+        while (true) {
+            try {
+                server.bind(tcpPort, udpPort);
+                return; // успешно забиндились — выходим
+            } catch (BindException e) {
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    // не смогли за maxAttempts — пробрасываем
+                    throw new IOException(
+                        "Не удалось забиндить порты " + tcpPort + "/" + udpPort +
+                            " после " + attempts + " попыток", e);
+                }
+                Logger.server("Порт занят, retry " + attempts + "/" + maxAttempts +
+                    " через " + delayMs + "ms...");
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Ожидание между попытками бинда прервано", ie);
+                }
+            }
+        }
+    }
+
+    public static PokerServer getInstance() {
+        return instance;
     }
     private boolean isNicknameTaken(String nickname) {
         return playerNicknames.containsKey(nickname) || waitingPlayers.containsKey(nickname);
@@ -371,9 +400,9 @@ public class PokerServer {
         try {
             scheduler.awaitTermination(2, TimeUnit.SECONDS);
         } catch (InterruptedException ignored) {}
-
         // 2) Останавливаем KryoNet
         server.stop();
-
+        server.close();
+        instance = null;
     }
 }

@@ -6,6 +6,9 @@ import java.util.List;
 
 public interface ClientListener {
     void onPlayerListUpdate(List<String> nicknames);
+
+    void onCheckPacket();
+
     void onCardInfo(CardInfo info);
     void onBlinds(BlindsNotification note);
     void onActionRequest(ActionRequest req);

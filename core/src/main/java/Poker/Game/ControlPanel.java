@@ -22,10 +22,11 @@ public class ControlPanel extends Table {
         pad(uiScale);
         defaults().space(uiScale);
 
-        add(restartBtn).width(120 * uiScale).height(50 * uiScale);
-        add(startBtn).width(120 * uiScale).height(50 * uiScale);
-        row();
+
+        //add(restartBtn).width(120 * uiScale).height(50 * uiScale);
         add(disconnectBtn).width(200 * uiScale).height(50 * uiScale);
+        row();
+        add(startBtn).width(200 * uiScale).height(50 * uiScale);
         pack();
         startBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {

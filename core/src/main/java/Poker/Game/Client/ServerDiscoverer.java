@@ -1,4 +1,6 @@
-package Poker.Game.PacketsClasses;
+package Poker.Game.Client;
+
+import Poker.Game.PacketsClasses.Logger;
 
 import java.net.*;
 import java.util.ArrayList;

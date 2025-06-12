@@ -142,7 +142,8 @@ public class PokerClient {
                     onWinnerPacket((WinnerPacket) object);
                 }else if (object instanceof SpectatorJoinedNotification) {
                     SpectatorJoinedNotification notif = (SpectatorJoinedNotification) object;
-
+                }else if(object instanceof CheckPacket){
+                    listener.onCheckPacket();
                 }
 
             }

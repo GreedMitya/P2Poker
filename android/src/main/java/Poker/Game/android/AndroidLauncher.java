@@ -1,29 +1,45 @@
 package Poker.Game.android;
 
+import Poker.Game.AndroidBridge;
 import Poker.Game.PokerApp;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
-import android.view.View;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 
-
-/** Launches the Android application. */
 public class AndroidLauncher extends AndroidApplication {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         AndroidApplicationConfiguration configuration = new AndroidApplicationConfiguration();
-        configuration.useImmersiveMode = true; // Рекомендуется, но не обязательно.
+        configuration.useImmersiveMode = true;
+        // Создаём bridge и передаём в PokerApp
+        AndroidBridge bridge = new AndroidBridge() {
+            @Override
+            public void exitApp() {
+                runOnUiThread(() -> {
+                    Gdx.app.exit();  // вызовет dispose() в PokerApp
 
-        // Инициализация вашего приложения
-        initialize(new PokerApp(), configuration);
+                    // закрыть таск и убрать из «Недавних»
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        finishAndRemoveTask();
+                    } else {
+                        finish();
+                    }
 
-        // Скрытие клавиатуры, если она открыта при старте
+                    // окончательно убить процесс
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                    System.exit(0);
+                });
+            }
+
+        };
+        initialize(new PokerApp(bridge), configuration);
         hideKeyboard();
     }
 
@@ -33,9 +49,7 @@ public class AndroidLauncher extends AndroidApplication {
             imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
         }
     }
-    
 
-    // Также можно скрыть клавиатуру при потере фокуса
     @Override
     public void onPause() {
         super.onPause();

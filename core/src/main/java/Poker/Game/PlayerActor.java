@@ -15,8 +15,8 @@ import java.util.List;
 public class PlayerActor extends WidgetGroup {
     private int tableSide = -1;
     private final float avatarSize   = 64f  * UIScale.ui;
-    private final float cardWidth    = 60f  * UIScale.ui;
-    private final float cardHeight   = 82f  * UIScale.ui;
+    private final float cardWidth    = 75f  * UIScale.ui;
+    private final float cardHeight   = 120f  * UIScale.ui;
     private final float cardSpacing  =  0f  * UIScale.ui;
     private final Skin skin;
     private final Table frameTable;
@@ -115,7 +115,7 @@ public class PlayerActor extends WidgetGroup {
 
             switch (tableSide) {
                 case 0: // низ
-                    x = avatarX - avatarW - dealerButton.getWidth() / 2f;
+                    x = avatarX - avatarW - dealerButton.getWidth() / 1.7f;
                     y = avatarY + 2*dealerButton.getHeight() + 2*margin;
                     break;
                 case 1: // право

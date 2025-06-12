@@ -3,14 +3,19 @@ package Poker.Game.core;
 import Poker.Game.PacketsClasses.CardInfo;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import Poker.Game.PacketsClasses.Logger;
+import Poker.Game.PacketsClasses.ReturnToLobbyPacket;
+import Poker.Game.Server.PokerServer;
 import com.esotericsoftware.kryonet.Server;
 
 public class PlayerManager {
     private Server server;
     private ArrayList<Player> players;
     private ArrayList<Player> activePlayers;
+    private PokerServer pokerServer;
 
     public PlayerManager(ArrayList<Player> players) {
         this.players = players;
@@ -95,7 +100,26 @@ public class PlayerManager {
     }
 
     public void removeBrokePlayers() {
-        activePlayers.removeIf(player -> player.getBalance() == 0);
+        // Собираем всех банкротов
+        List<Player> losers = activePlayers.stream()
+            .filter(p -> p.getBalance() == 0)
+            .collect(Collectors.toList());
+        if (losers.isEmpty()) {
+            return; // никого не нужно удалять
+        }
+
+        // Удаляем их из активных
+        activePlayers.removeAll(losers);
+
+        // Шлём каждому ReturnToLobbyPacket
+        for (Player loser : losers) {
+            server.sendToTCP(loser.getConnectionId(), new ReturnToLobbyPacket());
+            pokerServer.playerReadyStatus.remove(loser.getConnectionId());
+        }
+    }
+
+    public void setPokerServer(PokerServer pokerServer) {
+        this.pokerServer = pokerServer;
     }
 
     public void setServer(Server server) {

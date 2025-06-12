@@ -69,6 +69,8 @@ public class WinnerScreen implements Screen {
         }
 
         shapeRenderer = new ShapeRenderer();
+        SoundManager.getInstance().play("winner", 0.8f);
+
     }
 
     @Override

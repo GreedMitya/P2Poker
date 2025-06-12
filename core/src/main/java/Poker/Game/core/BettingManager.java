@@ -6,6 +6,7 @@ import com.esotericsoftware.kryonet.Server;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 
 public class BettingManager {
@@ -16,8 +17,8 @@ public class BettingManager {
     private PlayerManager playerManager;
     private double pot;
     private double currentBet;
-    private double smallBlind = 50;
-    private double bigBlind = 50;
+    private double smallBlind = 10;
+    private double bigBlind = 20;
     private int dealerIndex;
     private int smallBlindIndex;
     private int bigBlindIndex;
@@ -179,6 +180,22 @@ public class BettingManager {
 
         while (!roundEnded) {
             activePlayers = playerManager.getActivePlayers(); // на случай фолда
+            long nonAllIn = activePlayers.stream()
+                .filter(p -> !p.isFolded() && !p.isAllIn())
+                .count();
+            if (nonAllIn==1) {
+                // Находим этого единственного не-All-in игрока
+                Player caller = activePlayers.stream()
+                    .filter(p -> !p.isAllIn())
+                    .findFirst()
+                    .get();
+                System.out.println(caller.getCurrentBetFromPlayer()+ "");
+                // Если он уже сделал текущий колл (ставка совпала с текущим бетом) — завершаем
+                if ((caller.getCurrentBetFromPlayer() == currentBet)) {
+                    roundEnded = true;
+                    break;
+                }
+            }
             playersCount = activePlayers.size();
 
             for (int i = 0; i < playersCount; i++) {
@@ -190,7 +207,7 @@ public class BettingManager {
 
                 if (player.isFolded() || player.isAllIn()) continue;
 
-                PlayerAction actionObj = getPlayerActionWithTimeout(player, 1);
+                PlayerAction actionObj = getPlayerActionWithTimeout(player, 30);
                 String action = actionObj.actionType.toLowerCase();
                 double raiseAmount = actionObj.amount;
 
@@ -202,9 +219,11 @@ public class BettingManager {
                         pokerServer.sendChatMessage(player.getName() + " folds.");
                         break;
 
+
                     case "check":
                         if (currentBet == player.getCurrentBetFromPlayer()) {
                             pokerServer.sendChatMessage(player.getName() + " checks.");
+                            server.sendToAllTCP(new CheckPacket());
                         } else {
                             pokerServer.sendChatMessage(player.getName() + " cannot check, folds instead.");
                             player.fold();
@@ -256,6 +275,9 @@ public class BettingManager {
                         }
                         break;
                 }
+                nonAllIn = activePlayers.stream()
+                    .filter(p -> !p.isFolded() && !p.isAllIn())
+                    .count();
 
                 // Условие завершения раунда: все активные игроки поставили одинаково и все сделали хотя бы одно действие
                 boolean allMatched = activePlayers.stream()
@@ -266,7 +288,7 @@ public class BettingManager {
                     .filter(p -> !p.isFolded() && !p.isAllIn())
                     .allMatch(hasActed::contains);
 
-                if (allMatched && allActed) {
+                if ((allMatched && allActed) || (nonAllIn == 1 && allMatched)) {
                     roundEnded = true;
                     break;
                 }
@@ -308,7 +330,7 @@ public class BettingManager {
 
     private boolean checkIfRoundEnded() {
         if (playerManager.getActivePlayers().stream()
-            .filter(p -> !p.isFolded()) //&& !p.isAllIn()
+            .filter(p -> !p.isFolded()&&!p.isAllIn()) //&& !p.isAllIn()
             .allMatch(p -> p.getCurrentBetFromPlayer() == currentBet)) return true;//&& !p.isAllIn()
         List<Player> list = new ArrayList<>();
         for (Player player : playerManager.getActivePlayers()) {
@@ -316,7 +338,7 @@ public class BettingManager {
                 list.add(player);
             }
         }
-        return (list.isEmpty());
+        return (list.isEmpty()||list.size()==1);
     }
 
     public enum BettingPhase {

@@ -5,6 +5,8 @@ import Poker.Game.Server.PokerServer;
 import com.esotericsoftware.kryonet.Server;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 // Main Game Manager Class
@@ -84,6 +86,7 @@ public class PokerGame {
             endRound();
             return;
         }
+        pause(500);
         table.dealFlop(deck);
         table.showBoard();
         pokerServer.sendChatMessage("Flop: " + table.board.toString());
@@ -95,7 +98,7 @@ public class PokerGame {
             endRound();
             return;
         }
-
+        pause(800);
         table.dealTurn(deck);
         table.showBoard();
         pokerServer.sendChatMessage("Turn: " + table.board.toString());
@@ -107,7 +110,7 @@ public class PokerGame {
             endRound();
             return;
         }
-
+        pause(800);
         table.dealRiver(deck);
         table.showBoard();
         pokerServer.sendChatMessage("River: " + table.board.toString());
@@ -115,6 +118,13 @@ public class PokerGame {
         this.bettingPhase = BettingManager.BettingPhase.RIVER;
 
         determineWinner();
+    }
+    private void pause(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
     private boolean isRoundComplete() {
         this.activePlayers = new ArrayList<>();

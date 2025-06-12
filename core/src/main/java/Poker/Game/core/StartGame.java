@@ -84,6 +84,7 @@ public class StartGame {
             game.setPokerServer(pokerServer);
             game.setServer(server);
             game.bettingManager.setPokerServer(pokerServer);
+            game.playerManager.setPokerServer(pokerServer);// ✅ теперь можно обращаться к её полям
             game.playerManager.setServer(server);// ✅ теперь можно обращаться к её полям
             game.table.setServer(server);
             game.startGame(); // 🚀 запускаем игру

@@ -12,7 +12,11 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
 import Poker.Game.Client.PokerClient;
 
+import static com.badlogic.gdx.Gdx.app;
+
 public class ChatPanel extends Table implements ChatListener {
+    private SoundManager soundManager;
+
     private static final int MAX_MESSAGES = 100;
     private final Table messagesTable;
     private final ScrollPane scroll;
@@ -22,6 +26,9 @@ public class ChatPanel extends Table implements ChatListener {
     private final Label.LabelStyle sysLabelStyle;
     private boolean needsLayout = false;
     private boolean userScrolledUp = false;
+    public void setSoundManager(SoundManager soundManager) {
+        this.soundManager = soundManager;
+    }
 
     public ChatPanel(Skin skin, PokerClient client, float uiScale) {
         super(skin);
@@ -114,7 +121,7 @@ public class ChatPanel extends Table implements ChatListener {
             }
             needsLayout = true;
         } catch (Exception e) {
-            Gdx.app.error("SafeChatPanel", "addMessage failure: " + content, e);
+            app.error("SafeChatPanel", "addMessage failure: " + content, e);
         }
     }
 
@@ -123,9 +130,9 @@ public class ChatPanel extends Table implements ChatListener {
             try {
                 messagesTable.invalidateHierarchy();
                 scroll.updateVisualScroll();
-                Gdx.app.postRunnable(() -> scroll.scrollTo(0, 0, 0, 0));
+                app.postRunnable(() -> scroll.scrollTo(0, 0, 0, 0));
             } catch (Exception e) {
-                Gdx.app.error("SafeChatPanel", "updateLayout failure", e);
+                app.error("SafeChatPanel", "updateLayout failure", e);
             }
             needsLayout = false;
         }
@@ -135,7 +142,7 @@ public class ChatPanel extends Table implements ChatListener {
     public void onChatMessage(ChatMessage msg) {
         String prefix = msg.getName().equals("sys") ? "sys:" : msg.getName() + ":";
         String full = prefix + " " + msg.getMessage();
-        Gdx.app.postRunnable(() -> addMessage(full));
+        app.postRunnable(() -> addMessage(full));
     }
 
     @Override
@@ -145,5 +152,7 @@ public class ChatPanel extends Table implements ChatListener {
     @Override
     public void onPlayerJoinedNotification(PlayerJoinedNotification note) {
         addMessage(note.nickname + " joined the game.");
+        SoundManager.getInstance().play("enterance", 1f);
+
     }
 }
