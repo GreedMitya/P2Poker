@@ -24,7 +24,7 @@ import java.util.*;
 import java.util.List;
 
 
-public class GameScreen implements Screen, Poker.Game.ClientListener {
+public class GameScreen implements Screen, ClientListener {
     private static final float WORLD_WIDTH  = 1280f;
     private static final float WORLD_HEIGHT = 720f;
     private float cardWidth, cardHeight;
@@ -285,7 +285,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
 
     @Override
     public void onActionRequest(ActionRequest req) {
-        System.out.println("onActionRequest called for player: " + req.playerId);
+        //System.out.println("onActionRequest called for player: " + req.playerId);
         this.currentPlayerId  = req.playerId;
         this.currentActions   = req.availableActions;
 
@@ -319,6 +319,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         boolean canFold = false, canCall = false, canCheck = false, canRaise = false;
         int minRaise = 20;
         int maxRaise = 1000;
+        int callAmount = 0;
+        boolean isAllIn = false;
 
         for (Action a : availableActions) {
             switch (a.name.toLowerCase()) {
@@ -327,6 +329,8 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                     break;
                 case "call":
                     canCall = true;
+                    callAmount = (int) Math.round(a.amount);
+                    isAllIn = a.allIn; // вот он!
                     break;
                 case "check":
                     canCheck = true;
@@ -346,9 +350,13 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
         final boolean fCanRaise = canRaise;
         final int fMinRaise = minRaise;
         final int fMaxRaise = maxRaise;
+        final int fcallAmount = callAmount;
+        final boolean fisAllIn = isAllIn;
+
 
         Gdx.app.postRunnable(() -> actionPanel.updateButtons(
-            fCanFold, fCanCheck, fCanCall, fCanRaise, fMinRaise, fMaxRaise
+            fCanFold, fCanCheck, fCanCall, fCanRaise, fMinRaise, fMaxRaise,
+            fcallAmount, fisAllIn
         ));
     }
 
@@ -508,7 +516,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
     @Override
     public void onEndOfHandPacket(EndOfHandPacket packet) {
         Gdx.app.postRunnable(() -> {
-            Gdx.app.log("GameScreen", "onEndOfHandPacket ▶ " + packet);
+            //Gdx.app.log("GameScreen", "onEndOfHandPacket ▶ " + packet);
             if (packet.getHandsByPlayerId() == null
                 || packet.getWinnerIds() == null
                 || packet.getWinningsByPlayerId() == null) {
@@ -554,7 +562,7 @@ public class GameScreen implements Screen, Poker.Game.ClientListener {
                     for (PlayerActor playerActor : playerActorsById.values()) {
                         if (playerActor.isLocalPlayer()) {
                             // отправляем подтверждение
-                            System.out.println("GameScreen"+ "ClientReadyForNextRound");
+                            //System.out.println("GameScreen"+ "ClientReadyForNextRound");
                             client.sendReadyForNextRound(playerActor.getPlayerId(), true);
                         }
                     }

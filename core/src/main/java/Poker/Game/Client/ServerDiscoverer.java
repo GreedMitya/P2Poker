@@ -1,12 +1,14 @@
 package Poker.Game.Client;
 
 import Poker.Game.PacketsClasses.Logger;
+import com.esotericsoftware.kryonet.Server;
 
 import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ServerDiscoverer {
+    public ServerDiscoverer(){}
 
     private static final int DISCOVERY_PORT = 8888;
     private static final String DISCOVERY_REQUEST = "POKER_DISCOVER";

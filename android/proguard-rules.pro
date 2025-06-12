@@ -23,6 +23,7 @@
 
 -dontwarn android.support.**
 -dontwarn com.badlogic.gdx.backends.android.AndroidFragmentApplication
+-dontwarn sun.nio.ch.DirectBuffer
 
 # Needed by the gdx-controllers official extension.
 -keep class com.badlogic.gdx.controllers.android.AndroidControllers
@@ -37,6 +38,27 @@
    boolean reportFixture(long);
    float   reportRayFixture(long, float, float, float, float, float);
 }
+# Kryo и сериализуемые классы
+-keepclassmembers class * {
+    public <init>();       # сохраняем конструкторы без аргументов
+}
+
+-keepclassmembers class * implements com.esotericsoftware.kryo.Serializer {
+    public <init>();
+}
+
+-keepclasseswithmembers class * {
+    <init>();
+}
+
+-keep class com.poker.game.** { *; }
+# Не обфусцировать классы, участвующие в сериализации Kryo
+-keep class Poker.Game.PacketsClasses.Action { *; }
+-keep class Poker.Game.PacketsClasses.* { *; }
+-keep class com.esotericsoftware.kryo.** { *; }
+-keepclassmembers class * implements com.esotericsoftware.kryo.Serializer { *; }
+-keep class java.beans.** { *; }
+-dontwarn java.beans.**
 
 # You will need the next three lines if you use scene2d for UI or gameplay.
 # If you don't use scene2d at all, you can remove or comment out the next line:

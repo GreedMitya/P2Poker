@@ -318,6 +318,7 @@ public class PokerGame {
             pokerServer.sendWinnerAndShutdown(playerManager.getActivePlayers().get(0).getName());
             return;
         }
+        playerManager.updatePlayersBalance();
     }
 
     private void sleepBriefly() {

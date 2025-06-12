@@ -20,6 +20,7 @@ public class PokerApp extends Game {
     public void create() {
         //sounds = new SoundManager();
         setScreen(new LobbyScreen(this));
+        SoundManager.getInstance();
     }
     @Override
     public void dispose() {

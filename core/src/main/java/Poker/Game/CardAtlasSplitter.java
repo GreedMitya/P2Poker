@@ -13,7 +13,7 @@ public class CardAtlasSplitter extends ApplicationAdapter {
 
     @Override
     public void create() {
-        Texture atlas = new Texture(Gdx.files.absolute("C:/Users/Dimap/Desktop/Project Gambling/assets/sgx/raw/ACards.png"));
+        Texture atlas = new Texture(Gdx.files.internal("sgx/raw/ACards.png"));
         int cardWidth = 225;
         int cardHeight = 315;
 

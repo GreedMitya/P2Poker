@@ -119,8 +119,8 @@ public class PlayerActor extends WidgetGroup {
                     y = avatarY + 2*dealerButton.getHeight() + 2*margin;
                     break;
                 case 1: // право
-                    x = avatarX - avatarW - margin;
-                    y = avatarY + avatarH / 2f - dealerButton.getHeight() / 2f;
+                    x = avatarX - avatarW/2f;
+                    y = avatarY - avatarH/2f - dealerButton.getHeight() / 2f;
                     break;
                 case 2: // верх
                     x = avatarX - avatarW/2 - dealerButton.getWidth() / 2f;

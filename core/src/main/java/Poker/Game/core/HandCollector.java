@@ -9,6 +9,7 @@ public class HandCollector {
     private static Player player;
     private static Table table;
 
+
     public HandCollector(Player player, Table table){
         this.player = player;
         this.table = table;

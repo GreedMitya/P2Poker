@@ -36,8 +36,8 @@ public class PokerClient {
 
     public PokerClient(PokerApp pokerApp) {
         this.pokerApp = pokerApp;
-
     }
+    public PokerClient(){}
     public void registerPlayer(int id, String nickname) {
         idToNickname.put(id, nickname);
         nicknameToId.put(nickname, id);
@@ -108,7 +108,7 @@ public class PokerClient {
                 } else if (object instanceof BlindsNotification) {
                     listener.onBlinds((BlindsNotification) object);
                 } else if (object instanceof ActionRequest) {
-                    System.out.println("ClientListener"+ "Получен ActionRequest: " + object);
+                    //System.out.println("ClientListener"+ "Получен ActionRequest: " + object);
                     listener.onActionRequest((ActionRequest) object);
                 } else if (object instanceof PlayerBalanceUpdate) {
                     listener.onPlayerBalanceUpdate((PlayerBalanceUpdate) object);
@@ -176,7 +176,7 @@ public class PokerClient {
         }
     }
     public void sendCheck(int playerId) {
-        System.out.println("Отправляю действие: " + "Check" + " от игрока: " + playerId);
+       // System.out.println("Отправляю действие: " + "Check" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("check", 0, 0, 0);
@@ -184,7 +184,7 @@ public class PokerClient {
     }
 
     public void sendFold(int playerId) {
-        System.out.println("Отправляю действие: " + "Fold" + " от игрока: " + playerId);
+        //System.out.println("Отправляю действие: " + "Fold" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("fold", 0, 0, 0);
@@ -192,18 +192,18 @@ public class PokerClient {
     }
 
     public void sendCall(int playerId) {
-        System.out.println("Отправляю действие: " + "Call" + " от игрока: " + playerId);
+        //System.out.println("Отправляю действие: " + "Call" + " от игрока: " + playerId);
 
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("call", 0, 0, 0);
         client.sendTCP(resp);
-        System.out.println("client.isConnected() = " + client.isConnected());
-        System.out.println("client.getKryo() = " + client.getKryo());
+        //System.out.println("client.isConnected() = " + client.isConnected());
+        //System.out.println("client.getKryo() = " + client.getKryo());
     }
 
     public void sendRaise(int playerId, float amount) {
-        System.out.println("Отправляю действие: " + "Raise" + " от игрока: " + playerId);
+        //System.out.println("Отправляю действие: " + "Raise" + " от игрока: " + playerId);
         ActionResponse resp = new ActionResponse();
         resp.playerId = playerId;
         resp.chosenAction = new Action("raise", amount, 0, 0);

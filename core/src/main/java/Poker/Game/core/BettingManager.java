@@ -6,10 +6,13 @@ import com.esotericsoftware.kryonet.Server;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 
 public class BettingManager {
+    private final Lock betLock = new ReentrantLock();
     private PokerServer pokerServer;
     private Server server;
     private Map<Player, Double> playerBets;
@@ -25,7 +28,6 @@ public class BettingManager {
     private int currentPlayerIndex;
     private int i = 0;
     boolean bettingRoundActive = true;
-
     public BettingManager(PlayerManager playerManager, PotManager potManager) {
         this.playerBets = new HashMap<>();
         this.potManager = potManager;
@@ -46,24 +48,27 @@ public class BettingManager {
         return pot;
     }
 
-    private synchronized void placeBet(Player player, double amount) {
-        if (player.getBalance() > amount) {
-            // Если хватает денег, списываем полную сумму
-            player.decreaseBalance(amount);
-            player.setCurrentBetFromPlayers(player.getCurrentBetFromPlayer() + amount);
-            pot += amount;
-        } else {
-            // Игрок идет All-in
-            double allInAmount = player.getBalance();
-            player.decreaseBalance(allInAmount);
-            player.setAllIn();
-            player.setCurrentBetFromPlayers(player.getCurrentBetFromPlayer() + allInAmount);
-            pot += allInAmount;
+    private void placeBet(Player player, double amount) {
+        synchronized (betLock) {
+            if (player.getBalance() > amount) {
+                // Если хватает денег, списываем полную сумму
+                player.decreaseBalance(amount);
+                player.setCurrentBetFromPlayers(player.getCurrentBetFromPlayer() + amount);
+                pot += amount;
+            } else {
+                // Игрок идет All-in
+                double allInAmount = player.getBalance();
+                player.decreaseBalance(allInAmount);
+                player.setAllIn();
+                player.setCurrentBetFromPlayers(player.getCurrentBetFromPlayer() + allInAmount);
+                pot += allInAmount;
+            }
+            PlayerBalanceUpdate upd = new PlayerBalanceUpdate();
+            upd.name = player.getName();
+            upd.newBalance = player.getBalance();
+            server.sendToAllTCP(upd);
+
         }
-        PlayerBalanceUpdate upd = new PlayerBalanceUpdate();
-        upd.name = player.getName();
-        upd.newBalance = player.getBalance();
-        server.sendToAllTCP(upd);
     }
 
     public void setPokerServer(PokerServer pokerServer) {
@@ -125,26 +130,27 @@ public class BettingManager {
         server.sendToAllTCP(new PlayerBalanceUpdate(bigBlindPlayer.getName(), bigBlindPlayer.getBalance()));
     }
 
-    public Action[] getAvailableActionsFor(Player player) {
+    public synchronized Action[] getAvailableActionsFor(Player player) {
         List<Action> list = new ArrayList<>();
-        // всегда доступно «фолд»
         list.add(new Action("fold"));
-        // если можем чекнуть
+
         if (player.getCurrentBetFromPlayer() == currentBet) {
             list.add(new Action("check"));
         } else {
             double toCall = currentBet - player.getCurrentBetFromPlayer();
-            list.add(new Action("call", toCall, 0, 0));
+            boolean isAllIn = player.getBalance() <= toCall;
+
+            double callAmount = isAllIn ? player.getBalance() : toCall;
+            list.add(new Action("call", callAmount, 0, 0, isAllIn));
         }
-        // если можем рейзить
+
         double minRaise = Math.max(currentBet * 2, currentBet + bigBlind);
         double maxRaise = player.getBalance();
         if (maxRaise > minRaise) {
             list.add(new Action("raise", 0, minRaise, maxRaise));
         }
-        // в конце переконвертировать в массив
-        Action[] avail = list.toArray(new Action[0]);
-        return avail;
+
+        return list.toArray(new Action[0]);
     }
 
 
@@ -237,10 +243,9 @@ public class BettingManager {
                             break;
                         }
                         if (player.getBalance() <= currentBet) {
-                            pokerServer.sendChatMessage(player.getName() + " All-in.");
                             playerBets.put(player, player.getBalance() + player.getCurrentBetFromPlayer());
                             placeBet(player, currentBet - player.getCurrentBetFromPlayer());
-                            player.setCurrentBetFromPlayers(currentBet);
+                            pokerServer.sendChatMessage(player.getName() + " All-in.");
                             break;
                         }
                         playerBets.put(player, currentBet);
@@ -328,7 +333,7 @@ public class BettingManager {
 
 
 
-    private boolean checkIfRoundEnded() {
+    private synchronized boolean checkIfRoundEnded() {
         if (playerManager.getActivePlayers().stream()
             .filter(p -> !p.isFolded()&&!p.isAllIn()) //&& !p.isAllIn()
             .allMatch(p -> p.getCurrentBetFromPlayer() == currentBet)) return true;//&& !p.isAllIn()

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import Poker.Game.PacketsClasses.Logger;
+import Poker.Game.PacketsClasses.PlayerBalanceUpdate;
 import Poker.Game.PacketsClasses.ReturnToLobbyPacket;
 import Poker.Game.Server.PokerServer;
 import com.esotericsoftware.kryonet.Server;
@@ -56,6 +57,7 @@ public class PlayerManager {
 
 
     public void prepareForRound(Deck deck) {
+        updatePlayersBalance();
         if (players == null || players.isEmpty()) {
             Logger.Game("Список игроков не инициализирован.");
             return;
@@ -86,10 +88,17 @@ public class PlayerManager {
                 Logger.Game("Игрок в списке игроков равен null.");
             }
         }
-
-
-
     activePlayers.forEach(player -> Logger.Game(player.getName() + ": " + " [" +player.getBalance() + "]-" + player.getHand()));
+    }
+    public void updatePlayersBalance(){
+        for (Player player : activePlayers) {
+            if (player != null) {
+                PlayerBalanceUpdate upd = new PlayerBalanceUpdate();
+                upd.name = player.getName();
+                upd.newBalance = player.getBalance();
+                server.sendToAllTCP(upd);
+            }
+        }
     }
 
     public void collectCards(Deck deck) {

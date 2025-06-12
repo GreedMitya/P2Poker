@@ -1,5 +1,6 @@
 package Poker.Game.core;
 
+import Poker.Game.PacketsClasses.Logger;
 import Poker.Game.PacketsClasses.TableCardsInfo;
 import com.esotericsoftware.kryonet.Server;
 
@@ -19,7 +20,7 @@ public class Table {
     }
 
     public void dealFlop(Deck deck) {
-        System.out.println("Dealing Flop...");
+        Logger.Game("Dealing Flop...");
         board.add(deck.dealCard());
         board.add(deck.dealCard());
         board.add(deck.dealCard());
@@ -28,14 +29,14 @@ public class Table {
     }
 
     public void dealTurn(Deck deck) {
-        System.out.println("Dealing Turn...");
+        Logger.Game("Dealing Turn...");
         board.add(deck.dealCard());
         TableCardsInfo tableCardsInfo = new TableCardsInfo(board);
         server.sendToAllTCP(tableCardsInfo);
     }
 
     public void dealRiver(Deck deck) {
-        System.out.println("Dealing River...");
+        Logger.Game("Dealing River...");
         board.add(deck.dealCard());
         TableCardsInfo tableCardsInfo = new TableCardsInfo(board);
         server.sendToAllTCP(tableCardsInfo);
@@ -48,7 +49,7 @@ public class Table {
         server.sendToAllTCP(tableCardsInfo);
     }
     public void showBoard(){
-        System.out.println(board);
+        Logger.Game(board+"");
     }
     public ArrayList<Card> getBoard(){
         return board;

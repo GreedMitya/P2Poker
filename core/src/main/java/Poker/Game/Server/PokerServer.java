@@ -8,7 +8,6 @@ import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 import java.io.IOException;
 import java.net.*;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.Set;
@@ -55,7 +54,7 @@ public class PokerServer {
         server.addListener(new Listener() {
             @Override
             public void connected(Connection conn) {
-                Logger.server("connID=" + conn.getID() + " connected from " + conn.getRemoteAddressTCP());
+                //Logger.server("connID=" + conn.getID() + " connected from " + conn.getRemoteAddressTCP());
                 activeConnections.add(conn.getID());
             }
 
@@ -63,7 +62,7 @@ public class PokerServer {
             @Override
             public void disconnected(Connection conn) {
                 int id = conn.getID();
-                Logger.server("connID=" + id + " disconnected.");
+                //Logger.server("connID=" + id + " disconnected.");
                 activeConnections.remove(id);
                 playerReadyStatus.remove(id);
                 pendingActions.remove(id);
@@ -88,7 +87,7 @@ public class PokerServer {
 
             @Override
             public void received(Connection conn, Object obj) {
-                Logger.server("⧗ Received packet of type: " + obj.getClass().getName());
+                //Logger.server("⧗ Received packet of type: " + obj.getClass().getName());
 
 
                 if (obj instanceof JoinRequest) {
@@ -101,8 +100,8 @@ public class PokerServer {
                     }
                 } else if (obj instanceof ActionResponse) {
                     ActionResponse resp = (ActionResponse) obj;
-                    Logger.server("📥 [RESP] от playerId=" + resp.playerId +
-                        " action=" + resp.chosenAction.name + ", amount=" + resp.amount);
+                    //Logger.server("📥 [RESP] от playerId=" + resp.playerId +
+                    //    " action=" + resp.chosenAction.name + ", amount=" + resp.amount);
 
                     CompletableFuture<PlayerAction> future = pendingActions.remove(resp.playerId);
                     if (future != null) {
@@ -133,7 +132,7 @@ public class PokerServer {
                     ChatMessage mess = (ChatMessage) obj;
                     server.sendToAllTCP(mess);
                 }else if (obj instanceof ClientReadyForNextRound) {
-                    Logger.server("📥 [RESP] Client ready packet from playerId=" + ((ClientReadyForNextRound) obj).getPlayerId());
+                    //Logger.server("📥 [RESP] Client ready packet from playerId=" + ((ClientReadyForNextRound) obj).getPlayerId());
                     handleClientReadyForNextRound((ClientReadyForNextRound) obj);
                 } else if (obj instanceof RestartGameRequest) {
                     RestartGameRequest req = (RestartGameRequest) obj;
@@ -281,9 +280,9 @@ public class PokerServer {
         req.timeoutSec = timeoutSec;
         server.sendToTCP(connectionId, req);
 
-        Logger.server("► ActionRequest sent to playerId=" + connectionId +
-            ", actions=" + Arrays.toString(availableActions) +
-            ", timeout=" + timeoutSec);
+        //Logger.server("► ActionRequest sent to playerId=" + connectionId +
+        //    ", actions=" + Arrays.toString(availableActions) +
+        //    ", timeout=" + timeoutSec);
 
         // Таймаут → auto-check или auto-fold
         scheduler.schedule(() -> {
@@ -320,14 +319,14 @@ public class PokerServer {
         playerReadyStatus.put(playerId, isReady);
 
         if (areAllPlayersReady()) {
-            Logger.server("Все игроки подтвердили готовность – через 1 секунда стартуем новый раунд");
+            //Logger.server("Все игроки подтвердили готовность – через 1 секунда стартуем новый раунд");
             // Сразу обнуляем, чтобы дополнительная обработка не запустила ещё один раунд
             for (Integer id : playerReadyStatus.keySet()) {
                 playerReadyStatus.put(id, false);
             }
             // Планируем старт
             scheduler.schedule(() -> {
-                Logger.server("⏱ 1 секунда истекла – начинаем новый раунд");
+                //Logger.server("⏱ 1 секунда истекла – начинаем новый раунд");
                 startNextRound();
             }, 2, TimeUnit.SECONDS);
         }
@@ -364,7 +363,7 @@ public class PokerServer {
         server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
         // 🔄 Очищаем список ожидающих
         // ✅ Обновляем списки для клиентов уже после добавления новых игроков
-        System.out.println("Все игроки готовы. Начинаем новый раунд!");
+        //System.out.println("Все игроки готовы. Начинаем новый раунд!");
         startGame.getGame().resetBets();
         startGame.getGame().endRound();
         startGame.getGame().startNextRound();

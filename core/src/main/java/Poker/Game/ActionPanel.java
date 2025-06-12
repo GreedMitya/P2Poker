@@ -13,6 +13,9 @@ public class ActionPanel extends Table {
         void onCheck();
         void onRaise(int amount);
     }
+
+    private boolean isCallMode = false;
+
     private int minRaiseAmount = 20;
     private int maxRaiseAmount = 1000;
 
@@ -35,15 +38,11 @@ public class ActionPanel extends Table {
         this.minRaiseAmount = min;
         this.maxRaiseAmount = max;
 
-        // Обновляем границы слайдера
         raiseSlider.setRange(minRaiseAmount, maxRaiseAmount);
 
-        // Сбрасываем значение на минимум (или оставляем текущее в пределах нового диапазона)
-        int current = (int) raiseSlider.getValue();
-        if (current < minRaiseAmount || current > maxRaiseAmount) {
-            raiseSlider.setValue(minRaiseAmount);
-            raiseAmountLabel.setText(minRaiseAmount + "$");
-        }
+        // ВСЕГДА сбрасываем значение на минимум
+        raiseSlider.setValue(minRaiseAmount);
+        raiseAmountLabel.setText(minRaiseAmount + "$");
     }
 
 
@@ -79,15 +78,15 @@ public class ActionPanel extends Table {
         checkOrCallBtn.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                String mode = checkOrCallBtn.getText().toString();
-                if ("Call".equals(mode)) {
+                if (isCallMode) {
                     listener.onCall();
-                } else if ("Check".equals(mode)) {
+                } else {
                     listener.onCheck();
                 }
                 hide();
             }
         });
+
 
         raiseBtn.addListener(new ChangeListener() {
             @Override
@@ -129,7 +128,7 @@ public class ActionPanel extends Table {
      * Обновляет состояние кнопок в зависимости от возможностей игрока
      */
     public void updateButtons(boolean canFold, boolean canCheck, boolean canCall, boolean canRaise,
-                              int minRaise, int maxRaise) {
+                              int minRaise, int maxRaise, int callAmount, boolean isAllIn) {
         foldBtn.setVisible(canFold);
         foldBtn.setDisabled(!canFold);
         foldBtn.setTouchable(canFold ? Touchable.enabled : Touchable.disabled);
@@ -139,11 +138,21 @@ public class ActionPanel extends Table {
         raiseBtn.setTouchable(canRaise ? Touchable.enabled : Touchable.disabled);
 
         if (canCall) {
-            checkOrCallBtn.setText("Call");
+            isCallMode = true;
+            String callText = "Call " + callAmount + "$";
+            if (isAllIn) {
+                callText = "Call "+ "(All-in)";
+                checkOrCallBtn.getLabel().setColor(Color.RED);
+            } else {
+                checkOrCallBtn.getLabel().setColor(Color.WHITE);
+            }
+            checkOrCallBtn.setText(callText);
             checkOrCallBtn.setVisible(true);
             checkOrCallBtn.setDisabled(false);
             checkOrCallBtn.setTouchable(Touchable.enabled);
+
         } else if (canCheck) {
+            isCallMode = false;
             checkOrCallBtn.setText("Check");
             checkOrCallBtn.setVisible(true);
             checkOrCallBtn.setDisabled(false);
@@ -154,13 +163,13 @@ public class ActionPanel extends Table {
             checkOrCallBtn.setTouchable(Touchable.disabled);
         }
 
-        // Обновляем диапазон рейза
         setRaiseRange(minRaise, maxRaise);
         setVisible(true);
         checkOrCallBtn.toFront();
         invalidateHierarchy();
         pack();
     }
+
 
 
 
