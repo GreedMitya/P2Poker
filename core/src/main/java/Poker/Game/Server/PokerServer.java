@@ -70,7 +70,7 @@ public class PokerServer {
                 // Удаляем никнейм по значению (через итерацию)
                 playerNicknames.entrySet().removeIf(entry -> entry.getValue().equals(id));
                 startGame.removePlayer(id);
-                server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
+                //server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
 
                 // ⛔ Если хост отключился — завершить сервер
                 if (id == 1) {
@@ -249,6 +249,7 @@ public class PokerServer {
             if (gameAlreadyStarted) {
                 waitingPlayers.put(req.nickname, id);
                 sendChatMessage(req.nickname + " connected! Will play from next round!");
+                server.sendToTCP(id,new PlayerListUpdate(playerNicknames));
             } else {
                 Player player = new Player(req.nickname);
                 startGame.addPlayer(player.getName(), id);

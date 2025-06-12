@@ -136,7 +136,8 @@ public class PokerClient {
                 }else if (object instanceof ReturnToLobbyPacket) {
                     app.postRunnable(() -> {
                         Logger.client("Возврат на стартовый экран");
-                        pokerApp.setScreen(new LobbyScreen(pokerApp)); // или какой у тебя начальный экран
+                        disconnect();
+                        //pokerApp.setScreen(new LobbyScreen(pokerApp)); // или какой у тебя начальный экран
                     });
                 }else if (object instanceof WinnerPacket){
                     onWinnerPacket((WinnerPacket) object);
