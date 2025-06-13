@@ -71,6 +71,7 @@ public class ActionPanel extends Table {
             public void changed(ChangeEvent event, Actor actor) {
                 listener.onFold();
                 hide();
+                checkOrCallBtn.getLabel().setColor(Color.WHITE);
             }
         });
 
@@ -84,6 +85,7 @@ public class ActionPanel extends Table {
                     listener.onCheck();
                 }
                 hide();
+                checkOrCallBtn.getLabel().setColor(Color.WHITE);
             }
         });
 
