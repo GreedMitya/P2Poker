@@ -135,8 +135,12 @@ public class PokerClient {
                     listener.onBetUpdatePack((BetUpdatePack) object);
                 }else if (object instanceof ReturnToLobbyPacket) {
                     app.postRunnable(() -> {
-                        Logger.client("Возврат на стартовый экран");
-                        disconnect();
+                        if(!(connection.getID() == 1)) {
+                            Logger.client("Возврат на стартовый экран");
+                            disconnect();
+                        }else{
+                            sendChatMessage("Host loose the game need to restart for continue!))");
+                        }
                         //pokerApp.setScreen(new LobbyScreen(pokerApp)); // или какой у тебя начальный экран
                     });
                 }else if (object instanceof WinnerPacket){
