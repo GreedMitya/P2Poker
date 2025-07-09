@@ -75,5 +75,5 @@ subprojects {
   }
 }
 
-eclipse.project.name = 'ЗкщоусеProject_Gambling' + '-parent'
+eclipse.project.name = 'P2Poker' + '-parent'
 

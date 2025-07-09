@@ -51,10 +51,10 @@
     <init>();
 }
 
--keep class com.poker.game.** { *; }
+-keep class GreedMitya.P2Poker.** { *; }
 # Не обфусцировать классы, участвующие в сериализации Kryo
--keep class Poker.Game.PacketsClasses.Action { *; }
--keep class Poker.Game.PacketsClasses.* { *; }
+-keep class GreedMitya.P2Poker.PacketsClasses.Action { *; }
+-keep class GreedMitya.P2Poker.PacketsClasses.* { *; }
 -keep class com.esotericsoftware.kryo.** { *; }
 -keepclassmembers class * implements com.esotericsoftware.kryo.Serializer { *; }
 -keep class java.beans.** { *; }
