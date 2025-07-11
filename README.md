@@ -46,4 +46,7 @@
  - TestCode: [`HandEvaluatorTest.java`](HandEvaluatorTest.java)
  - Симуляция 1,000,000 случайных раздач между двумя руками:
  - Просто запустить и сверить выборку рук и комбинаций с теорией вероятности!
-(Так же, внутри, есть функция проверки правильности определения комбинаций! "// testKnownHands();" ) 
+(Так же, внутри, есть функция проверки правильности определения комбинаций! "// testKnownHands();" )
+
+<img width="606" height="600" alt="{C12B3BCF-1385-4C6C-BD05-A0FC90DF8F9C}" src="https://github.com/user-attachments/assets/0f124052-6064-4da1-afea-ed616504ef3c" />
+
