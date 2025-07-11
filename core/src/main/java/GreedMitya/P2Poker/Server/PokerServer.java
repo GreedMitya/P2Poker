@@ -24,16 +24,12 @@ public class PokerServer {
     private Server server;
     private StartGame startGame;
     private volatile boolean isShuttingDown = false;
-    // Храним nickname по connectionId
     public final Map<String, Integer> playerNicknames = new ConcurrentHashMap<>();
-    // pendingActions: ключ — connectionId игрока, значение — будущее выбранного действия
     private final Map<Integer, CompletableFuture<PlayerAction>> pendingActions = new ConcurrentHashMap<>();
-
-    // вместо Executors.newScheduledThreadPool(4);
     private final ScheduledExecutorService scheduler =
         Executors.newScheduledThreadPool(4, r -> {
             Thread t = new Thread(r);
-            t.setDaemon(true);  // демон — не будет мешать JVM завершиться
+            t.setDaemon(true);
             return t;
         });
 
@@ -44,13 +40,10 @@ public class PokerServer {
     public void start() throws IOException {
         server = new Server();
 
-        // Регистрируем все пакеты (ActionRequest, ActionResponse, Action, Action[].class и т.д.)
         Network.register(server.getKryo());
 
-        // Запускаем «слушалку» для любых UDP Broadcast, если нужно
         BroadcastResponder.startListening();
 
-        // Listener для основных пакетов: Join, GameStart и наши ActionResponse
         server.addListener(new Listener() {
             @Override
             public void connected(Connection conn) {
@@ -67,16 +60,14 @@ public class PokerServer {
                 playerReadyStatus.remove(id);
                 pendingActions.remove(id);
 
-                // Удаляем никнейм по значению (через итерацию)
                 playerNicknames.entrySet().removeIf(entry -> entry.getValue().equals(id));
                 startGame.removePlayer(id);
                 //server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
 
-                // ⛔ Если хост отключился — завершить сервер
                 if (id == 1) {
-                    Logger.server("⛔ Хост отключился! Сервер будет остановлен...");
-                    sendChatMessage("⛔ Хост покинул игру. Сервер завершает работу...");
-                    shutdownServer();// 2 сек задержка для красоты
+                    Logger.server("Хост отключился! Сервер будет остановлен...");
+                    sendChatMessage(" Хост покинул игру. Сервер завершает работу...");
+                    shutdownServer();
                 }
             }
 
@@ -117,11 +108,10 @@ public class PokerServer {
                         Thread game = new Thread(() -> {
                             try {
                                 startGame.startGame();
-                                // основной запуск игры
                             } catch (Exception e) {
                                 Logger.server("Ошибка при запуске игры: " + e.getMessage());
-                                e.printStackTrace(); // или Logger.server(e)
-                                server.stop(); // остановим сервер
+                                e.printStackTrace();
+                                server.stop();
                             }
 
                         });game.setDaemon(true);game.start();
@@ -136,19 +126,13 @@ public class PokerServer {
                     handleClientReadyForNextRound((ClientReadyForNextRound) obj);
                 } else if (obj instanceof RestartGameRequest) {
                     RestartGameRequest req = (RestartGameRequest) obj;
-                    if (req.senderId == 1) { // Только хост
-                        Logger.server("↻ Получен Restart от хоста!");
-
-                        // 1. Обнулим всё
+                    if (req.senderId == 1) {
+                        Logger.server("Получен Restart от хоста!");
                         playerNicknames.clear();
                         pendingActions.clear();
-
-                        // 2. Перезапустим логику StartGame
                         startGame = new StartGame();
                         startGame.setServer(PokerServer.this);
-
-                        // 3. Всем клиентам: сказать, что произошёл рестарт
-                        server.sendToAllTCP(new ChatMessage("♻ Игра была перезапущена хостом", "sys"));
+                        server.sendToAllTCP(new ChatMessage("Игра была перезапущена хостом", "sys"));
                         server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
                         server.sendToAllTCP(new RestartGameNotification());
                     }
@@ -157,11 +141,10 @@ public class PokerServer {
             }
         });
 
-        bindWithRetry(54555, 54777);// выбирайте ваши порты
+        bindWithRetry(54555, 54777);
         server.start();
 
 
-        // KeepAlive-пинг всем клиентам
         scheduler.scheduleWithFixedDelay(() -> {
             for (Connection conn : server.getConnections()) {
                 conn.sendTCP(new KeepAlive());
@@ -169,7 +152,6 @@ public class PokerServer {
             //Logger.server("KeepAlive отправлен всем клиентам");
         }, 5, 5, TimeUnit.SECONDS);
 
-        // Инициализируем логику игры
         startGame = new StartGame();
         startGame.setServer(this);
 
@@ -183,11 +165,10 @@ public class PokerServer {
         while (true) {
             try {
                 server.bind(tcpPort, udpPort);
-                return; // успешно забиндились — выходим
+                return;
             } catch (BindException e) {
                 attempts++;
                 if (attempts >= maxAttempts) {
-                    // не смогли за maxAttempts — пробрасываем
                     throw new IOException(
                         "Не удалось забиндить порты " + tcpPort + "/" + udpPort +
                             " после " + attempts + " попыток", e);
@@ -215,7 +196,6 @@ public class PokerServer {
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
                 NetworkInterface intf = en.nextElement();
 
-                // Пропускаем loopback и неактивные
                 if (intf.isLoopback() || !intf.isUp()) continue;
 
                 for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
@@ -223,7 +203,6 @@ public class PokerServer {
 
                     if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
                         String ip = inetAddress.getHostAddress();
-                        // Фильтрация виртуальных/мобильных
                         if (!ip.startsWith("127.") && !ip.startsWith("0.")) {
                             return ip;
                         }
@@ -259,14 +238,6 @@ public class PokerServer {
         }
     }
 
-
-    /**
-     * Запрос хода у клиента.
-     * @param connectionId ID соединения (Connection.getID())
-     * @param availableActions массив доступных Action
-     * @param timeoutSec таймаут в секундах
-     * @return Future, которое вернёт name выбранного действия
-     */
     public CompletableFuture<PlayerAction> requestPlayerAction(int connectionId,
                                                                Action[] availableActions,
                                                                int timeoutSec,
@@ -285,7 +256,6 @@ public class PokerServer {
         //    ", actions=" + Arrays.toString(availableActions) +
         //    ", timeout=" + timeoutSec);
 
-        // Таймаут → auto-check или auto-fold
         scheduler.schedule(() -> {
             if (!future.isDone()) {
                 Logger.server("Timeout: auto-decision for " + connectionId);
@@ -321,13 +291,11 @@ public class PokerServer {
 
         if (areAllPlayersReady()) {
             //Logger.server("Все игроки подтвердили готовность – через 1 секунда стартуем новый раунд");
-            // Сразу обнуляем, чтобы дополнительная обработка не запустила ещё один раунд
             for (Integer id : playerReadyStatus.keySet()) {
                 playerReadyStatus.put(id, false);
             }
-            // Планируем старт
             scheduler.schedule(() -> {
-                //Logger.server("⏱ 1 секунда истекла – начинаем новый раунд");
+                //Logger.server(" 1 секунда истекла – начинаем новый раунд");
                 startNextRound();
             }, 2, TimeUnit.SECONDS);
         }
@@ -343,11 +311,9 @@ public class PokerServer {
         return true;
     }
     private void startNextRound() {
-        // Перед стартом нового раунда:
         for (Map.Entry<String, Integer> entry : waitingPlayers.entrySet()) {
             String nickname = entry.getKey();
             int connectionID = entry.getValue();
-            // Проверить, нет ли такого игрока в active players
             boolean alreadyExists = false;
             for (Player p : startGame.getPlayers()) {
                 if (p.getName().equals(nickname)) {
@@ -362,8 +328,6 @@ public class PokerServer {
         }
         waitingPlayers.clear();
         server.sendToAllTCP(new PlayerListUpdate(playerNicknames));
-        // 🔄 Очищаем список ожидающих
-        // ✅ Обновляем списки для клиентов уже после добавления новых игроков
         //System.out.println("Все игроки готовы. Начинаем новый раунд!");
         startGame.getGame().resetBets();
         startGame.getGame().endRound();
@@ -374,33 +338,22 @@ public class PokerServer {
     public void sendWinnerAndShutdown(String winnerName) {
         if (isShuttingDown) return;
         isShuttingDown = true;
-
-        // 1) Мгновенно рассылаем победителем
         WinnerPacket win = new WinnerPacket();
         win.setName(winnerName);
         server.sendToAllTCP(win);
-
-        // 2) Через 5 сек — возвращаем всех в лобби
         scheduler.schedule(() -> {
             server.sendToAllTCP(new ReturnToLobbyPacket());
-
-            // 3) Ещё через 1 сек — останавливаем сервер
             scheduler.schedule(this::shutdownServer, 1, TimeUnit.SECONDS);
 
         }, 5, TimeUnit.SECONDS);
     }
-    // Удаляем старый sendWinner(!) и в core-коде вызываем именно sendWinnerAndShutdown(...)
     public void shutdownServer() {
         System.out.println("[SERVER] Shutting down...");
         BroadcastResponder.stopListening();
-
-
-        // 1) Останавливаем таймеры
         scheduler.shutdownNow();
         try {
             scheduler.awaitTermination(2, TimeUnit.SECONDS);
         } catch (InterruptedException ignored) {}
-        // 2) Останавливаем KryoNet
         server.stop();
         server.close();
         instance = null;

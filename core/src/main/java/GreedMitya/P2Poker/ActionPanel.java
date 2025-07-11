@@ -40,7 +40,7 @@ public class ActionPanel extends Table {
 
         raiseSlider.setRange(minRaiseAmount, maxRaiseAmount);
 
-        // ВСЕГДА сбрасываем значение на минимум
+
         raiseSlider.setValue(minRaiseAmount);
         raiseAmountLabel.setText(minRaiseAmount + "$");
     }
@@ -49,23 +49,20 @@ public class ActionPanel extends Table {
     public ActionPanel(Skin skin, ActionListener listener, float uiScale) {
         this.listener = listener;
 
-        // Создаем кнопки и элементы управления
+
         foldBtn = new TextButton("Fold", skin);
         checkOrCallBtn = new TextButton("Check", skin);
         raiseBtn = new TextButton("Raise", skin);
         raiseSlider = new Slider(20, 1000, 10, false, skin);
         raiseAmountLabel = new Label("20$", skin);
 
-        // Стилизация
         raiseAmountLabel.setFontScale(1.5f);
         raiseAmountLabel.setColor(Color.GREEN);
 
-        // Названия для отладки
         foldBtn.setName("Fold");
         checkOrCallBtn.setName("CheckOrCall");
         raiseBtn.setName("Raise");
 
-        // Поведение кнопок
         foldBtn.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -75,7 +72,6 @@ public class ActionPanel extends Table {
             }
         });
 
-        // Универсальный слушатель для Check/Call
         checkOrCallBtn.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -94,7 +90,7 @@ public class ActionPanel extends Table {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 listener.onRaise((int) raiseSlider.getValue());
-                raiseSlider.setValue(minRaiseAmount); // Сброс на актуальный минимум
+                raiseSlider.setValue(minRaiseAmount);
                 raiseAmountLabel.setText(minRaiseAmount + "$");
                 hide();
             }
@@ -109,7 +105,6 @@ public class ActionPanel extends Table {
             }
         });
 
-        // Разметка
         padRight(25f * uiScale);
         add().width(0).height(0);
         add().width(0).height(0);

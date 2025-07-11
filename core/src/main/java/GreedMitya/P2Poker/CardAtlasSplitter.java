@@ -22,7 +22,6 @@ public class CardAtlasSplitter extends ApplicationAdapter {
 
         TextureRegion[][] regions = TextureRegion.split(atlas, cardWidth, cardHeight);
 
-        // Подготавливаем данные текстуры
         TextureData textureData = atlas.getTextureData();
         if (!textureData.isPrepared()) {
             textureData.prepare();
@@ -35,7 +34,6 @@ public class CardAtlasSplitter extends ApplicationAdapter {
                 int x = region.getRegionX();
                 int y = region.getRegionY();
 
-                // Вырезаем нужную часть
                 Pixmap cardPixmap = new Pixmap(cardWidth, cardHeight, fullPixmap.getFormat());
                 cardPixmap.drawPixmap(fullPixmap, 0, 0, x, y, cardWidth, cardHeight);
 
@@ -53,7 +51,6 @@ public class CardAtlasSplitter extends ApplicationAdapter {
     }
 
 
-    // Запуск через main метод
     public static void main(String[] args) {
         CardAtlasSplitter splitter = new CardAtlasSplitter();
         splitter.create();

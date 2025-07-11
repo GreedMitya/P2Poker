@@ -103,7 +103,7 @@ public class Player {
     }
 
     public void decreaseBalance(double amount) {
-        if (amount <= 0) return; // Нельзя вычитать отрицательные значения
+        if (amount <= 0) return;
 
         if (balance >= amount) {
             balance -= amount;
@@ -119,7 +119,7 @@ public class Player {
 
     public void increaseBalance(double amount) {
         if (amount > 0) {
-            balance += amount; // Предотвращаем отрицательные пополнения
+            balance += amount;
         }
     }
 
@@ -148,7 +148,7 @@ public class Player {
                 return "raise";
             default:
                 System.out.println("Invalid option. Please choose again.");
-                return getAction();  // рекурсивный вызов для повторного ввода
+                return getAction();
         }
     }
 

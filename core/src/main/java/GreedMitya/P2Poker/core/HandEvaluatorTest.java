@@ -18,7 +18,6 @@ public class HandEvaluatorTest {
         System.out.println("Тест известных комбинаций...");
         Deck deck1 = new Deck();
         Table table = new Table(deck1);
-        // Эмуляция игроков
         Player player1 = new Player("Игрок 1");
         Player player2 = new Player("Игрок 2");
         List<Player> players = new ArrayList<>();
@@ -26,7 +25,6 @@ public class HandEvaluatorTest {
         players.add(player2);
         PlayerManager playerManager = new PlayerManager((ArrayList<Player>) players);
 
-        // Пример рук (создайте свои тестовые наборы)
         player1.getHand().addAll(Arrays.asList(
             new Card(Card.Rank.King, Card.Suit.Spades),
             new Card(Card.Rank.King, Card.Suit.Diamonds)
@@ -43,7 +41,6 @@ public class HandEvaluatorTest {
             new Card(Card.Rank.Two, Card.Suit.Clubs)
         ));
 
-        // Оценка рук
         for (Player p : playerManager.getPlayers()) {
             HandCollector handCollector = new HandCollector(p, table);
             p.setTotalHand();
@@ -101,7 +98,6 @@ public class HandEvaluatorTest {
             table.board.add(deck.dealCard());
             System.out.println("----------------------------------------");
 
-            // Оценка рук
             List<Player> activePlayers = new ArrayList<>();
             for (Player player : playerManager.getActivePlayers()) {
                 if (!player.isFolded()) {

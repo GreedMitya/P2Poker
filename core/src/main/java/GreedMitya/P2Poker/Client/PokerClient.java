@@ -14,9 +14,6 @@ import java.util.Map;
 
 import static com.badlogic.gdx.Gdx.app;
 
-/**
- * Клиент для покер-рума, «чистый» от консоли, отдаёт все события в ClientListener.
- */
 public class PokerClient {
     private PokerApp pokerApp;
     private ChatListener chatListener;
@@ -40,7 +37,7 @@ public class PokerClient {
     public void registerPlayer(int id, String nickname) {
         idToNickname.put(id, nickname);
         nicknameToId.put(nickname, id);
-        // если это мы — сохраняем clientId
+
         if (nickname.equals(this.name)) {
             this.clientId = id;
         }
@@ -55,33 +52,24 @@ public class PokerClient {
     }
 
 
-    /** Зарегистрировать слушателя событий (UI, логика и т.п.). */
     public void setListener(ClientListener listener) {
         this.listener = listener;
     }
 
-    /**
-     * Запустить клиент: установить соединение и отправить JoinRequest.
-     *
-     * @param hostIP   IP-адрес сервера
-     * @param nickname Никнейм игрока
-     * @throws IOException если не удалось подключиться
-     */
     public void start(String hostIP, String nickname) throws IOException {
         client = new Client();
-        // Регистрация всех пакетов
         Kryo kryo = client.getKryo();
         Network.register(kryo);
         client.start();
 
 
-        // Во всех потоках KryoNet — ловим uncaught exceptions
+
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-            System.err.println("💥 Uncaught exception in thread " + thread.getName());
+            System.err.println("Uncaught exception in thread " + thread.getName());
             throwable.printStackTrace();
         });
 
-        // Листенер для входящих пакетов
+
         client.addListener(new Listener() {
             @Override
             public void received(Connection connection, Object object) {
@@ -90,7 +78,6 @@ public class PokerClient {
 
                 else if (object instanceof PlayerListUpdate) {
                     PlayerListUpdate update = (PlayerListUpdate) object;
-                    // Регистрируем всех игроков: nickname → id
                     for (Map.Entry<String, Integer> entry : update.getNicknames().entrySet()) {
                         String nickname = entry.getKey();
                         int playerId = entry.getValue();
@@ -118,7 +105,7 @@ public class PokerClient {
                 }else if (object instanceof ChatMessage) {
                     ChatMessage message = (ChatMessage) object;
                     if (chatListener != null) {
-                        chatListener.onChatMessage(message); // просто проксируем
+                        chatListener.onChatMessage(message);
                     }
                 }else if (object instanceof PotUpdate) {
                     listener.onPotUpdate((PotUpdate) object);
@@ -140,7 +127,7 @@ public class PokerClient {
                         }else{
                             sendChatMessage("Host loose the game need to restart for continue!))");
                         }
-                        //pokerApp.setScreen(new LobbyScreen(pokerApp)); // или какой у тебя начальный экран
+                        //pokerApp.setScreen(new LobbyScreen(pokerApp));
                     });
                 }else if (object instanceof WinnerPacket){
                     onWinnerPacket((WinnerPacket) object);
@@ -156,27 +143,24 @@ public class PokerClient {
                 Logger.client("Disconnected from server, returning to lobby…");
                 client.stop();
                 app.postRunnable(() -> {
-                    // Используй переданный pokerApp напрямую
                     pokerApp.setScreen(new LobbyScreen(pokerApp));
                 });
             }
         });
 
-        // Подключаемся к серверу (таймаут 5000 ms, TCP 54555, UDP 54777)
         client.connect(5000, hostIP, 54555, 54777);
 
-        // Отправляем запрос на присоединение
         this.name = nickname;
         client.sendTCP(new JoinRequest(nickname));
     }
-    // === Методы для UI / контроллера, вызываемые при клике на кнопки ===
+
     public void disconnect() {
         if (client != null && client.isConnected()) {
             idToNickname.clear();
             nicknameToId.clear();
             clientId = -1;
             name = null;
-            client.close(); // Закрываем соединение (без ожидания)
+            client.close();
         }
     }
     public void sendCheck(int playerId) {
@@ -215,7 +199,6 @@ public class PokerClient {
         client.sendTCP(resp);
     }
 
-    /** Если нужно дать хосту UI-кнопку «Start Game». */
     public void sendGameStart() {
         client.sendTCP(new GameStartRequest());
     }
@@ -256,10 +239,8 @@ public class PokerClient {
 
         Gdx.app.postRunnable(() -> {
             if (winnerName.equals(this.name)) {
-                // Мы победитель — показываем WinnerScreen на 5 секунд
                 pokerApp.setScreen(new WinnerScreen(this.pokerApp, winnerName));
             } else {
-                // Кто-то другой выиграл — сразу возвращаемся в Lobby
                 pokerApp.setScreen(new LobbyScreen(this.pokerApp));
             }
         });

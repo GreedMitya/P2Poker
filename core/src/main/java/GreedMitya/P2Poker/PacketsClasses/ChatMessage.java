@@ -6,7 +6,6 @@ public class ChatMessage {
     public String name;
 
     public ChatMessage() {
-        // KryoNet требует пустой конструктор
     }
 
     public ChatMessage(String message, String name) {

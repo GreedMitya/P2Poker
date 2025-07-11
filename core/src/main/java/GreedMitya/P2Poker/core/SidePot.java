@@ -8,7 +8,7 @@ public class SidePot {
     private String name;
     private int sidePotCounter = 0;
     double amount;
-    List<Player> eligiblePlayers; // Игроки, которые могут претендовать на этот банк
+    List<Player> eligiblePlayers;
 
     public SidePot(double amount, List<Player> eligiblePlayers) {
         sidePotCounter++;

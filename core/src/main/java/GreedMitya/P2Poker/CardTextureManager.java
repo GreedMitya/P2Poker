@@ -23,8 +23,7 @@ public class CardTextureManager {
                 cardTextures.put(key, new TextureRegion(texture));
             }
         }
-        // Загружаем рубашку
-        Texture back = new Texture(Gdx.files.internal("sgx/exported_cards/back.png")); // <-- путь к рубашке
+        Texture back = new Texture(Gdx.files.internal("sgx/exported_cards/back.png"));
         backTexture = new TextureRegion(back);
     }
     public static TextureRegion getBackTexture() {

@@ -20,7 +20,7 @@ public class BroadcastResponder {
 
                 while (!Thread.currentThread().isInterrupted()) {
                     DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                    socket.receive(packet);  // тут бросит SocketException, когда закроем сокет
+                    socket.receive(packet);
 
                     String message = new String(packet.getData(), 0, packet.getLength());
                     if ("POKER_DISCOVER".equals(message)) {

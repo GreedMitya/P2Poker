@@ -19,21 +19,16 @@ public class AndroidLauncher extends AndroidApplication {
         super.onCreate(savedInstanceState);
         AndroidApplicationConfiguration configuration = new AndroidApplicationConfiguration();
         configuration.useImmersiveMode = true;
-        // Создаём bridge и передаём в PokerApp
         AndroidBridge bridge = new AndroidBridge() {
             @Override
             public void exitApp() {
                 runOnUiThread(() -> {
-                    Gdx.app.exit();  // вызовет dispose() в PokerApp
-
-                    // закрыть таск и убрать из «Недавних»
+                    Gdx.app.exit();
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         finishAndRemoveTask();
                     } else {
                         finish();
                     }
-
-                    // окончательно убить процесс
                     android.os.Process.killProcess(android.os.Process.myPid());
                     System.exit(0);
                 });

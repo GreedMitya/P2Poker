@@ -41,7 +41,7 @@ android {
   buildTypes {
     release {
       ndk {
-        debugSymbolLevel = 'FULL' // или 'SYMBOL_TABLE'
+        debugSymbolLevel = 'FULL'
       }
       minifyEnabled true
       shrinkResources true
@@ -53,8 +53,8 @@ android {
     applicationId "com.GreedMitya.P2Poker"
     minSdkVersion 26
     targetSdkVersion 36
-    versionCode 4
-    versionName "1.0.4-beta"
+    versionCode 5
+    versionName "1.0.5"
     multiDexEnabled true
   }
   compileOptions {
@@ -64,7 +64,6 @@ android {
   }
 
   repositories {
-    // needed for AAPT2, may be needed for other tools
     google()
   }
 
@@ -83,9 +82,6 @@ android {
 
   }
 
-// Called every time gradle gets executed, takes the native dependencies of
-// the natives configuration, and extracts them to the proper libs/ folders
-// so they get packed with the APK.
   tasks.register('copyAndroidNatives') {
     doFirst {
       file("libs/armeabi-v7a/").mkdirs()

@@ -7,7 +7,6 @@ public class ClientReadyForNextRound {
     private boolean isReady;
 
     public ClientReadyForNextRound() {
-        // Конструктор по умолчанию для Kryo
     }
 
     public ClientReadyForNextRound(int playerId, boolean isReady) {

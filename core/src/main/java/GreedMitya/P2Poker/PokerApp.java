@@ -18,7 +18,6 @@ public class PokerApp extends Game {
     }
     @Override
     public void create() {
-        //sounds = new SoundManager();
         setScreen(new LobbyScreen(this));
         SoundManager.getInstance();
     }
@@ -27,17 +26,14 @@ public class PokerApp extends Game {
         super.dispose();
         if (sounds != null) sounds.dispose();
         System.out.println("[APP] Disposing...");
-        // Останавливаем сервер, если он запущен
         if (PokerServer.getInstance() != null) {
             PokerServer.getInstance().shutdownServer();
         }
-        // Если это Android-версия и мост установлен — закрываем через него
         if (androidBridge != null && Gdx.app.getType() == Application.ApplicationType.Android) {
             androidBridge.exitApp();
         }
-        // На десктопе просто выходим из VM
         if (Gdx.app.getType() != Application.ApplicationType.Android) {
-            Gdx.app.exit();   // гарантированно вызовет завершение Lwjgl3Application
+            Gdx.app.exit();
         }
     }
 }

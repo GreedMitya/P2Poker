@@ -29,37 +29,29 @@ public class GameScreen implements Screen, ClientListener {
     private static final float WORLD_HEIGHT = 720f;
     private float cardWidth, cardHeight;
     private float tableCenterX, tableCenterY, radius;
-    // === Ссылки на приложение и клиент ===
+
     private final PokerApp app;
     private final PokerClient client;
     private final boolean isHost;
     private int myPlayerId;
     private static final float CARD_GAP    = 6f;
-    // === Сцена, скин, текстуры ===
     private Stage stage;
     private Skin skin;
     private Texture avatarTexture;
-    // === Игроки и их актёры ===
     private final Map<Integer, PlayerActor> playerActorsById = new HashMap<>();
     private List<String> currentPlayers = new ArrayList<>();
     private final Map<String, Double> playerBalances = new HashMap<>();
-    // === Карты текущего игрока и оппонентов ===
     private final List<CardActor> playerCardActors = new ArrayList<>();
     private final Map<Integer, List<CardActor>> opponentCardActors = new HashMap<>();
-    // === Карты на столе ===
     private final List<CardActor> tableCardActors = new ArrayList<>();
-    // === UI: кнопки, слайдер, лейблы, чат ===
     private ControlPanel controlPanel;
     private Label     raiseAmountLabel, potLabel;
     private boolean startButtonShown = false;
-
-    // === Для управления потоком действий ===
     private int    currentPlayerId;
     private Action[] currentActions;
-    // === Транзитные актёры (летящие поты, метки комбинаций) ===
     private Map<Integer, Double> betMap = new HashMap<>();
     private final List<Actor> transientActors = new ArrayList<>();
-    private Timer.Task hideButtonsTask; // поле класса
+    private Timer.Task hideButtonsTask;
     private float uiScale;
     private ChatPanel chatPanel;
     private ActionPanel actionPanel;
@@ -68,7 +60,7 @@ public class GameScreen implements Screen, ClientListener {
 
     public GameScreen(PokerApp app, PokerClient client, boolean isHost) {
         UIScale.ui = Math.min(WORLD_WIDTH, WORLD_HEIGHT) / 800f;
-        this.uiScale = UIScale.ui;  // обязательно сохранить в поле класса
+        this.uiScale = UIScale.ui;
         this.app    = app;
         this.client = client;
         this.isHost = isHost;
@@ -87,9 +79,7 @@ public class GameScreen implements Screen, ClientListener {
 
     @Override
     public void show() {
-        // Загрузка карт
         CardTextureManager.load();
-        // Сцена и фон
         avatarTexture = new Texture(Gdx.files.internal("sgx/raw/defaulrAvatar.png"));
         //FitViewport viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT);
         StretchViewport viewport = new StretchViewport(WORLD_WIDTH, WORLD_HEIGHT);
@@ -104,10 +94,8 @@ public class GameScreen implements Screen, ClientListener {
         bg.setSize(WORLD_WIDTH, WORLD_HEIGHT);
         bg.setPosition(0, 0);
         stage.addActor(bg);
-        // Стол
         Texture tableTex = new Texture(Gdx.files.internal("sgx/raw/Atp.png"), true);
         stage.addActor(new TableActor(tableTex, WORLD_WIDTH, WORLD_HEIGHT));
-        // Пот
         potLabel = new Label("Pot: 0", skin);
         float fontScale = Math.min(Gdx.graphics.getWidth(), Gdx.graphics.getHeight()) / 800f;
         potLabel.setFontScale(fontScale);
@@ -139,7 +127,7 @@ public class GameScreen implements Screen, ClientListener {
             }
         });
 
-        controlPanel.setPosition((5f)  * uiScale, (WORLD_HEIGHT-25f) * uiScale); // например, левый нижний угол с отступом
+        controlPanel.setPosition((5f)  * uiScale, (WORLD_HEIGHT-25f) * uiScale);
         stage.addActor(controlPanel);
         actionPanel = new ActionPanel(skin, new ActionPanel.ActionListener() {
             @Override
@@ -147,7 +135,7 @@ public class GameScreen implements Screen, ClientListener {
                 client.sendFold(myPlayerId);
                 PlayerActor me = playerActorsById.get(myPlayerId);
                 if (me != null) {
-                    me.dimCards(); // затемняем карты
+                    me.dimCards();
                 }
             }
 
@@ -173,7 +161,6 @@ public class GameScreen implements Screen, ClientListener {
 
 
     }
-    // === Resize / render / dispose ===
     @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
@@ -195,7 +182,6 @@ public class GameScreen implements Screen, ClientListener {
         skin.dispose();
         avatarTexture.dispose();
     }
-    // === Реализация ClientListener ===
     @Override
     public void onPlayerListUpdate(List<String> nicknames) {
         this.currentPlayers = nicknames;
@@ -203,9 +189,6 @@ public class GameScreen implements Screen, ClientListener {
 
         Gdx.app.postRunnable(() -> {
             arrangePlayersOnTable(currentPlayers);
-
-            // Показываем кнопки Хоста лишь один раз,
-            // когда игроков стало 2 или больше
             if (isHost
                 && nicknames.size() >= 2
                 && controlPanel != null
@@ -221,17 +204,12 @@ public class GameScreen implements Screen, ClientListener {
     public void onPlayerOrderPacket(PlayerOrderPacket packet) {
         this.currentPlayers = packet.getLogicalOrder();
 
-        // Запускаем на рендер-потоке
         Gdx.app.postRunnable(() -> {
-            // 1. Удаляем всех старых акторов за столом
             for (PlayerActor pa : playerActorsById.values()) {
                 pa.remove();
             }
             playerActorsById.clear();
-            // 2. Класс arrangePlayersOnTable уже умеет добавлять по списку currentPlayers
             arrangePlayersOnTable(currentPlayers);
-
-            // 3. Сбрасываем UI прошлой раздачи (кнопки, карты)
             actionPanel.hide();
             for (PlayerActor pa : playerActorsById.values()) {
                 pa.clearHandCards();
@@ -265,7 +243,6 @@ public class GameScreen implements Screen, ClientListener {
     @Override
     public void onBlinds(BlindsNotification note) {
         Gdx.app.postRunnable(() -> {
-            // Каждое сообщение отдельно в чат
             for (String msg : note.getMessages()) {
                 chatPanel.addMessage(msg);
             }
@@ -289,29 +266,25 @@ public class GameScreen implements Screen, ClientListener {
         this.currentPlayerId  = req.playerId;
         this.currentActions   = req.availableActions;
 
-        // Отменяем предыдущий таймер скрытия
         if (hideButtonsTask != null) {
             hideButtonsTask.cancel();
             hideButtonsTask = null;
         }
 
-        // Показываем панель действий только если это ты
         if (req.playerId == myPlayerId) {
             Gdx.app.postRunnable(() -> {
                 actionPanel.show();
-
-                // Обновим доступные кнопки:
                 updateActionButtons(req.availableActions);
             });
         } else {
-            actionPanel.hide(); // прячем у других
+            actionPanel.hide();
         }
         hideButtonsTask = Timer.schedule(new Timer.Task() {
             @Override
             public void run() {
                 Gdx.app.postRunnable(() -> actionPanel.hide());
             }
-        }, 30); // через 30 секунд
+        }, 30);
 
     }
 
@@ -330,14 +303,13 @@ public class GameScreen implements Screen, ClientListener {
                 case "call":
                     canCall = true;
                     callAmount = (int) Math.round(a.amount);
-                    isAllIn = a.allIn; // вот он!
+                    isAllIn = a.allIn;
                     break;
                 case "check":
                     canCheck = true;
                     break;
                 case "raise":
                     canRaise = true;
-                    // Сохраняем min/max из объекта Action
                     minRaise = (int) Math.round(a.min);
                     maxRaise = (int) Math.round(a.max);
                     break;
@@ -413,11 +385,10 @@ public class GameScreen implements Screen, ClientListener {
         Gdx.app.postRunnable(() -> {
             List<Card> hand = info.getHand();
 
-            // Находим своего игрока
             PlayerActor me = playerActorsById.get(client.getMyId());
             if (me != null) {
-                me.clearCardBacks();               // убирать рубашки, если они были
-                me.showHandCards(hand);            // показываем карты лицом
+                me.clearCardBacks();
+                me.showHandCards(hand);
             }
 
             chatPanel.addMessage("Your cards: " + hand);
@@ -426,7 +397,6 @@ public class GameScreen implements Screen, ClientListener {
     }
 
     private void arrangePlayersOnTable(List<String> logicalOrder) {
-        // Удаляем старые
         for (PlayerActor pa : playerActorsById.values()) pa.remove();
         playerActorsById.clear();
 
@@ -436,24 +406,19 @@ public class GameScreen implements Screen, ClientListener {
         float centerX = worldW / 2f;
         float centerY = worldH / 2f - worldH * 0.08f;
 
-        float a = worldW * 0.35f; // полуось по X (ширина стола)
-        float b = worldH * 0.30f; // полуось по Y (высота стола)
-
+        float a = worldW * 0.35f;
+        float b = worldH * 0.30f;
         int total = logicalOrder.size();
         int myIndex = logicalOrder.indexOf(client.getNickName());
 
-        // Смещение "я" в visualOrder — только если 6 игроков, тогда я сижу справа внизу
         int visualOffset = (total == 6) ? -1 : 0;
         int shiftedIndex = (myIndex + visualOffset + total) % total;
 
-        // Сдвигаем список так, чтобы "я" оказался в нужной позиции
         List<String> visualOrder = new ArrayList<>();
         for (int i = 0; i < total; i++) {
             visualOrder.add(logicalOrder.get((shiftedIndex + i) % total));
         }
 
-
-        // Список кол-ва игроков по сторонам: низ, право, верх, лево
         int[] sectorCounts = new int[4];
         if (total == 2) {
             sectorCounts[0] = 1; sectorCounts[1] = 0; sectorCounts[2] = 1; sectorCounts[3] = 0;
@@ -488,16 +453,16 @@ public class GameScreen implements Screen, ClientListener {
                 float x = centerX;
                 float y = centerY;
 
-                if (side == 0) { // низ
+                if (side == 0) {
                     x = centerX - a + 2 * a * t;
                     y = centerY - b;
-                } else if (side == 1) { // право
+                } else if (side == 1) {
                     x = centerX + a;
                     y = centerY - b + 2 * b * t;
-                } else if (side == 2) { // верх
+                } else if (side == 2) {
                     x = centerX + a - 2 * a * t;
                     y = centerY + b;
-                } else if (side == 3) { // лево
+                } else if (side == 3) {
                     x = centerX - a;
                     y = centerY + b - 2 * b * t;
                 }
@@ -505,7 +470,7 @@ public class GameScreen implements Screen, ClientListener {
                 x -= pa.getWidth() / 2f;
                 y -= pa.getHeight() * (side == 2 ? 0.6f : 0.2f);
 
-                pa.setTableSide(side); // Добавь сюда
+                pa.setTableSide(side);
                 pa.setPosition(x, y);
                 stage.addActor(pa);
                 playerActorsById.put(id, pa);
@@ -524,9 +489,8 @@ public class GameScreen implements Screen, ClientListener {
                 return;
             }
 
-            // 1) Показываем карты оппонентов
+
             revealOpponentCards(packet.getHandsByPlayerId());
-            // Тут же показываем всем КомбоТексты!
             List<Integer> ids   = packet.getWinnerIds();
             List<String> names  = packet.getCombinationNames();
             for (int i = 0; i < ids.size(); i++) {
@@ -534,16 +498,11 @@ public class GameScreen implements Screen, ClientListener {
                 if (p != null) showWinningComboText(p, names.get(i));
             }
 
-
-            // 2) Собираем единую последовательность действийv
             int winnersCount = packet.getWinnerIds().size();
-            float postShowDelay = 1f * winnersCount; // ждать столько же секунд, сколько победителей
+            float postShowDelay = 1f * winnersCount;
 
             SequenceAction fullSeq = Actions.sequence(
-                // a) первичная задержка, чтобы игроки увидели карты
                 Actions.delay(2f),
-
-                // b) скрыть potLabel и запустить последовательную подсветку
                 Actions.run(() -> {
                     potLabel.setVisible(false);
                     showWinnersSequentially(
@@ -553,22 +512,17 @@ public class GameScreen implements Screen, ClientListener {
                         packet.getWinningsByPlayerId()
                     );
                 }),
-                // c) подождать, пока все подсветки/анимации пройдут
                 Actions.delay(postShowDelay),
-                // d) очистка всех временных элементов и возврат UI
                 Actions.run(() -> {
                     clearFloatingActors();
-                    //potLabel.setVisible(true); // Хочу чтобы он появлялся только на начале следующего раунда
                     for (PlayerActor playerActor : playerActorsById.values()) {
                         if (playerActor.isLocalPlayer()) {
-                            // отправляем подтверждение
                             //System.out.println("GameScreen"+ "ClientReadyForNextRound");
                             client.sendReadyForNextRound(playerActor.getPlayerId(), true);
                         }
                     }
                 })
             );
-            // 3) Запускаем на stage
             stage.addAction(fullSeq);
         });
     }
@@ -585,7 +539,6 @@ public class GameScreen implements Screen, ClientListener {
 
             List<Card> hand = entry.getValue();
             List<CardActor> backs = pa.getBackActors();
-            // Может оказаться, что рубашек больше/меньше — тогда подстраиваем:
             int n = Math.min(backs.size(), hand.size());
 
             for (int i = 0; i < n; i++) {
@@ -593,14 +546,11 @@ public class GameScreen implements Screen, ClientListener {
                 Card face = hand.get(i);
 
                 back.addAction(Actions.sequence(
-                    // 1) Сжимаем по горизонтали до 0 за 0.2 с (имитация правой половины переворота)
                     Actions.scaleTo(0f, 1f, 0.2f),
-                    // 2) Меняем сторону карты
                     Actions.run(() -> {
                         back.setFaceDown(false);
                         back.setCard(face);
                     }),
-                    // 3) Расширяем назад до полного размера за 0.2 с (левая половина переворота)
                     Actions.scaleTo(1f, 1f, 0.3f)
                 ));
 
@@ -634,30 +584,24 @@ public class GameScreen implements Screen, ClientListener {
         for (int i = 0; i < winnerIds.size(); i++) {
             int pid       = winnerIds.get(i);
             double amount = winningsByPlayerId.getOrDefault(pid, 0.0);
-            if (amount <= 0) continue;  // пропускаем
+            if (amount <= 0) continue;
 
             List<Card> combo   = winningCardsByWinner.get(i);
             String comboName   = combinationNames.get(i);
 
-            // подсветка
             seq.addAction(Actions.run(() -> highlightWinningCardsForPlayer(pid, combo)));
-            // анимация пота
             seq.addAction(Actions.run(() -> animatePotToWinner(pid, amount)));
-            // текст
             seq.addAction(Actions.run(() -> {
                 PlayerActor p = playerActorsById.get(pid);
                 if (p != null) showWinningComboText(p, comboName);
             }));
-            // пауза 2 секунды
             seq.addAction(Actions.delay(2.5f));
-            // сброс
             seq.addAction(Actions.run(this::resetAllHighlights));
         }
 
-        // финальный сброс
         seq.addAction(Actions.run(() -> {
             clearTransientActors();
-            // potLabel.setVisible(true); // Хочу чтобы появлялся аж в начале раунда!
+            // potLabel.setVisible(true);
         }));
 
         stage.addAction(seq);
@@ -668,7 +612,6 @@ public class GameScreen implements Screen, ClientListener {
     private void highlightWinningCardsForPlayer(int playerId, List<Card> winningCards) {
         Set<Card> winningSet = new HashSet<>(winningCards);
 
-        // Подсветка борда
         for (CardActor ca : tableCardActors) {
             ca.setHighlight(winningSet.contains(ca.getCard()));
         }
@@ -678,10 +621,8 @@ public class GameScreen implements Screen, ClientListener {
 
         List<CardActor> actors;
         if (playerId == currentPlayerId) {
-            // свои карты
             actors = pa.getCardActors();
         } else {
-            // «ревеленные» карты оппонента
             actors = pa.getBackActors();
         }
 
@@ -744,13 +685,11 @@ public class GameScreen implements Screen, ClientListener {
         ));
     }
     private void clearFloatingActors() {
-        // Удаляем все transient-акторы
         for (Actor a : transientActors) {
             if (a.hasParent()) a.remove();
         }
         transientActors.clear();
 
-        // Удаляем выложенные карты оппонентов
         for (List<CardActor> list : opponentCardActors.values()) {
             for (CardActor ca : list) {
                 if (ca.hasParent()) ca.remove();
@@ -758,7 +697,6 @@ public class GameScreen implements Screen, ClientListener {
         }
         opponentCardActors.clear();
 
-        // Если есть свои карты или карты стола — тоже убираем
         playerCardActors.forEach(Actor::remove);
         playerCardActors.clear();
         tableCardActors.forEach(Actor::remove);

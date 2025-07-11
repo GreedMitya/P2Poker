@@ -10,7 +10,7 @@ import java.util.ArrayList;
 public class StartGame {
     private PokerServer pokerServer;
     private Server server;
-    private ArrayList<Player> players; // теперь поле, а не внутри main
+    private ArrayList<Player> players;
     private PokerGame game;
 
     public StartGame() {
@@ -35,7 +35,7 @@ public class StartGame {
             players.remove(toRemove);
             Logger.Game("Удалён игрок: " + toRemove.getName());
         } else {
-            Logger.Game("⚠ Не найден игрок с connectionId=" + connectionID);
+            Logger.Game("Не найден игрок с connectionId=" + connectionID);
         }
 
         if (game != null && game.playerManager != null) {
@@ -47,7 +47,6 @@ public class StartGame {
 
     public void addPlayer(String nickname, int connectionID) {
         synchronized (this) {
-            // Проверка дубликатов
             for (Player p : players) {
                 if (p.getConnectionId() == connectionID) {
                     Logger.Game("Игрок с connectionID " + connectionID + " уже добавлен, пропускаем.");
@@ -58,7 +57,6 @@ public class StartGame {
                     return;
                 }
             }
-            // Если прошло проверку — добавляем
             Player newPlayer = new Player(nickname);
             newPlayer.setServer(server);
             newPlayer.setConnectionId(connectionID);
@@ -79,15 +77,15 @@ public class StartGame {
     public void startGame() {
         if (players.size() >= 2) {
             pokerServer.gameAlreadyStarted = true;
-            game = new PokerGame(players);// ✅ сначала создаём игру
+            game = new PokerGame(players);
             game.setStartGame(this);
             game.setPokerServer(pokerServer);
             game.setServer(server);
             game.bettingManager.setPokerServer(pokerServer);
-            game.playerManager.setPokerServer(pokerServer);// ✅ теперь можно обращаться к её полям
-            game.playerManager.setServer(server);// ✅ теперь можно обращаться к её полям
+            game.playerManager.setPokerServer(pokerServer);
+            game.playerManager.setServer(server);
             game.table.setServer(server);
-            game.startGame(); // 🚀 запускаем игру
+            game.startGame();
         } else {
             Logger.Game("Недостаточно игроков для начала");
         }
@@ -104,7 +102,5 @@ public class StartGame {
     public PokerGame getGame(){
         return game;
     }
-
-    // main не нужен — запуск будет с UI или сетевого события
 }
 

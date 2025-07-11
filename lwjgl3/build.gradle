@@ -50,8 +50,6 @@ dependencies {
 def os = System.properties['os.name'].toLowerCase()
 
 run {
-  // Устанавливаем рабочую директорию на core/assets,
-  // тогда Gdx.files.internal("fonts/arial.ttf") найдёт ваш файл
   workingDir = file("$rootDir/core/assets")
   if (os.contains('mac')) jvmArgs += "-XstartOnFirstThread"
 }

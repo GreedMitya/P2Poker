@@ -61,15 +61,13 @@ public class PotManager {
             //System.out.println(streetName + " bets are empty, skipping...");
             return;
         }
-
-        // Собираем все ставки
         List<Map.Entry<Player, Double>> sortedBets = new ArrayList<>(streetBets.entrySet());
-        sortedBets.sort(Comparator.comparingDouble(Map.Entry::getValue)); // Сортируем по размеру ставок
+        sortedBets.sort(Comparator.comparingDouble(Map.Entry::getValue));
 
         double totalStreetAmount = streetBets.values().stream().mapToDouble(Double::doubleValue).sum();
 
         while (!sortedBets.isEmpty()) {
-            double minBet = sortedBets.get(0).getValue(); // Берем минимальную ставку
+            double minBet = sortedBets.get(0).getValue();
             List<Player> eligiblePlayers = new ArrayList<>();
             double sidePotAmount = 0;
 
@@ -81,11 +79,11 @@ public class PotManager {
                 if (bet >= minBet) {
                     eligiblePlayers.add(player);
                     sidePotAmount += minBet;
-                    entry.setValue(bet - minBet); // Уменьшаем ставку игрока
+                    entry.setValue(bet - minBet);
                 }
 
                 if (entry.getValue() == 0) {
-                    iterator.remove(); // Удаляем игроков, у которых ставки исчерпаны
+                    iterator.remove();
                 }
             }
 
@@ -95,8 +93,6 @@ public class PotManager {
                 //System.out.println("Created Side Pot: " + sidePotAmount + " - Players: " + eligiblePlayers);
             }
         }
-
-        // Добавляем все ставки с улицы в главный банк
         mainPot += streetBets.values().stream().mapToDouble(Double::doubleValue).sum();
         finalPot += totalStreetAmount;
         PotUpdate potUpdate = new PotUpdate(finalPot);

@@ -36,17 +36,15 @@ public class WinnerScreen implements Screen {
 
     public WinnerScreen(PokerApp app, String winnerName) {
         this.app = app;
-
-        // init stage with an ExtendViewport (keeps aspect ratio, scales to fit)
         stage = new Stage(new ExtendViewport(480, 800));
         Gdx.input.setInputProcessor(stage);
 
-        // Table + Label for adaptive centered text
+
         Skin skin = new Skin(Gdx.files.internal("sgx/skin/sgx-ui.json"),
             new TextureAtlas(Gdx.files.internal("sgx/skin/sgx-ui.atlas")));
         Label.LabelStyle style = new Label.LabelStyle(skin.getFont("title"), Color.GOLD);
         Label label = new Label("🎉 " + winnerName + " wins! 🎉", style);
-        label.setFontScale(1.5f);  // scale relative to 480×800 world units
+        label.setFontScale(1.5f);
 
         Table table = new Table();
         table.setFillParent(true);
@@ -54,7 +52,6 @@ public class WinnerScreen implements Screen {
         table.add(label);
         stage.addActor(table);
 
-        // confetti – initialize in world coords
         float worldW = stage.getViewport().getWorldWidth();
         float worldH = stage.getViewport().getWorldHeight();
         for (int i = 0; i < confetti.length; i++) {
@@ -85,12 +82,9 @@ public class WinnerScreen implements Screen {
             return;
         }
 
-        // update viewport & clear
         stage.getViewport().apply();
         Gdx.gl.glClearColor(0, 0, 0.15f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-        // update & draw confetti in world coordinates
         float worldW = stage.getViewport().getWorldWidth();
         float worldH = stage.getViewport().getWorldHeight();
         for (ConfettiParticle p : confetti) p.update(delta, worldH);
@@ -103,14 +97,12 @@ public class WinnerScreen implements Screen {
         }
         shapeRenderer.end();
 
-        // draw UI
         stage.act(delta);
         stage.draw();
     }
 
     @Override
     public void resize(int width, int height) {
-        // viewport will recalculate worldWidth/worldHeight
         stage.getViewport().update(width, height, true);
     }
 

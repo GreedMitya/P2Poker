@@ -109,18 +109,15 @@ public class PlayerManager {
     }
 
     public void removeBrokePlayers() {
-        // Собираем всех банкротов
         List<Player> losers = activePlayers.stream()
             .filter(p -> p.getBalance() == 0)
             .collect(Collectors.toList());
         if (losers.isEmpty()) {
-            return; // никого не нужно удалять
+            return;
         }
 
-        // Удаляем их из активных
         activePlayers.removeAll(losers);
 
-        // Шлём каждому ReturnToLobbyPacket
         for (Player loser : losers) {
             server.sendToTCP(loser.getConnectionId(), new ReturnToLobbyPacket());
             pokerServer.playerReadyStatus.remove(loser.getConnectionId());

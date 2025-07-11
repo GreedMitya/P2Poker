@@ -1,7 +1,7 @@
 package GreedMitya.P2Poker.PacketsClasses;
 
 public class PlayerAction {
-    public String actionType; // "fold", "call", "raise", ...
+    public String actionType;
     public double amount;
 
     public PlayerAction(){}

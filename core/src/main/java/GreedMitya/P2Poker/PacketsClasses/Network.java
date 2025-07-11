@@ -9,7 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Network {
     public static void register(Kryo kryo) {
-        // Стандартные классы
         kryo.register(Integer.class);
         kryo.register(String.class);
         kryo.register(String[].class);
@@ -21,12 +20,10 @@ public class Network {
         kryo.register(ConcurrentHashMap.class);
         kryo.register(Logger.class);
 
-        // Enum-классы
         kryo.register(Card.Rank.class);
         kryo.register(Card.Suit.class);
         kryo.register(PlayerState.class);
 
-        // Классы core и игровая логика
         kryo.register(Card.class);
         kryo.register(Card.Suit.class, new DefaultSerializers.EnumSerializer(Card.Suit.class));
         kryo.register(Card.Rank.class, new DefaultSerializers.EnumSerializer(Card.Rank.class));
@@ -44,9 +41,8 @@ public class Network {
         kryo.register(RoundCounter.class);
         kryo.register(Table.class);
 
-        // Пакеты и сетевые сообщения
         kryo.register(Action.class);
-        kryo.register(Action[].class); // важно после Action
+        kryo.register(Action[].class);
         kryo.register(ActionRequest.class);
         kryo.register(ActionResponse.class);
         kryo.register(BetUpdatePack.class);

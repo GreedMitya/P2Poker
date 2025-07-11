@@ -31,19 +31,19 @@ public class ChatPanel extends Table implements ChatListener {
 
     public ChatPanel(Skin skin, PokerClient client, float uiScale) {
         super(skin);
-        // Styles
+
         Label.LabelStyle base = skin.get("default", Label.LabelStyle.class);
         chatLabelStyle = new Label.LabelStyle(base);
         chatLabelStyle.fontColor = Color.WHITE;
         sysLabelStyle = new Label.LabelStyle(base);
         sysLabelStyle.fontColor = Color.WHITE;
 
-        // Message table
+
         messagesTable = new Table();
         messagesTable.top().left();
         messagesTable.defaults().pad(uiScale).left().width(380f * uiScale);
 
-        // ScrollPane
+
         scroll = new ScrollPane(messagesTable, skin);
         scroll.setScrollingDisabled(true, false);
         scroll.setFadeScrollBars(false);
@@ -58,7 +58,7 @@ public class ChatPanel extends Table implements ChatListener {
             }
         });
 
-        // Input
+
         inputField = new TextField("", skin);
         inputField.setMessageText("Type a message...");
         sendButton = new TextButton("Send", skin);
@@ -73,7 +73,7 @@ public class ChatPanel extends Table implements ChatListener {
             }
         });
 
-        // Layout
+
         pad(uiScale);
         defaults().space(uiScale);
         add(scroll).colspan(2).width(460f * uiScale).height(250f * uiScale).row();
@@ -113,10 +113,10 @@ public class ChatPanel extends Table implements ChatListener {
                 .width(380f * UIScale.ui)
                 .left()
                 .row();
-            // Trim old messages
+
             if (messagesTable.getChildren().size > MAX_MESSAGES) {
                 Actor firstActor = messagesTable.getChildren().first();
-                messagesTable.removeActor(firstActor); // корректно удаляет и Actor, и Cell
+                messagesTable.removeActor(firstActor);
             }
             needsLayout = true;
         } catch (Exception e) {

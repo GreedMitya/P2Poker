@@ -48,40 +48,34 @@ public class LobbyScreen implements Screen {
     @Override
     public void show() {
         if (errorMessage != null) {
-            // Показываем сообщение только после инициализации stage и skin
             Gdx.app.postRunnable(() -> showDialog(errorMessage));
         }
         stage = new Stage(new ScreenViewport());
         Gdx.input.setInputProcessor(stage);
 
-        // Загружаем скин и атлас
         skin = new Skin(
             Gdx.files.internal("sgx/skin/sgx-ui.json"),
             new TextureAtlas(Gdx.files.internal("sgx/skin/sgx-ui.atlas"))
         );
 
         TextField.TextFieldStyle style = new TextField.TextFieldStyle(skin.get(TextField.TextFieldStyle.class));
-        // Заменяем шрифт на увеличенный и жирный
         style.font.getData().setScale(2.5f);
         style.font.setColor(Color.BLACK);
-        // Создаем виджеты
         final TextField nickField = new TextField("", style);
         nickField.setMessageText("Your name: ");
         nickField.setTextFieldListener((field, key) -> {
             if (key == '\n' || key == '\r') {
-                field.getOnscreenKeyboard().show(false); // Скрываем клавиатуру
-                stage.setKeyboardFocus(null);            // Убираем фокус с поля
+                field.getOnscreenKeyboard().show(false);
+                stage.setKeyboardFocus(null);
             }
         });
         nickField.setTextFieldFilter(new TextField.TextFieldFilter() {
             @Override
             public boolean acceptChar(TextField textField, char c) {
-                // Разрешаем только буквы, цифры и подчёркивание
                 return Character.isLetterOrDigit(c) || c == '_';
             }
         });
 
-        // Применяем стиль
         final TextField ipField = new TextField("", style);
         ipField.setMessageText("IP host: ");
         ipField.setTextFieldListener((field, key) -> {
@@ -103,7 +97,6 @@ public class LobbyScreen implements Screen {
                 scanButton.setText("Scanning...");
                 scanButton.setDisabled(true);
                 new Thread(() -> {
-                    // 1) Находим сервера
                     final java.util.List<String> servers = ServerDiscoverer.discoverServers(2000);
                     Gdx.app.postRunnable(() -> {
                         scanButton.setText("Scan LAN");
@@ -112,15 +105,11 @@ public class LobbyScreen implements Screen {
                         if (servers.isEmpty()) {
                             showDialog("No servers found on LAN");
                         } else {
-                            // 2) Создаём контент для диалога
                             List.ListStyle listStyle = new List.ListStyle();
-                            // Настроим шрифт
                             BitmapFont font = new BitmapFont();
-                            font.getData().setScale(2f);  // Изменим масштаб шрифта
-                            listStyle.font = font;  // Установим шрифт для списка
-                            // Вы можете также установить фоны для выбранных и невыбранных элементов
-                            listStyle.selection = skin.getDrawable("list-selection");  // Это должен быть заранее определенный Drawable
-                            // Теперь создаем List с этим стилем
+                            font.getData().setScale(2f);
+                            listStyle.font = font;
+                            listStyle.selection = skin.getDrawable("list-selection");
                             final List<String> list = new List<>(listStyle);
                             list.setItems(servers.toArray(new String[0]));
                             ScrollPane pane = new ScrollPane(list, skin);
@@ -131,11 +120,9 @@ public class LobbyScreen implements Screen {
                             pane.setScrollbarsOnTop(true);
                             pane.setSmoothScrolling(true);
 
-                            // 3) Собираем сам диалог с переопределением result()
                             Dialog dlg = new Dialog("Select server", skin) {
                                 @Override
                                 protected void result(Object result) {
-                                    // Здесь придёт то, что мы передали в button(...)
                                     if (Boolean.TRUE.equals(result)) {
                                         String ip = list.getSelected();
                                         String nick = nickField.getText().trim();
@@ -148,23 +135,18 @@ public class LobbyScreen implements Screen {
                                 }
                             };
 
-                            // Кладём ScrollPane в контентную таблицу
                             dlg.getContentTable().add(pane)
                                 .width(1000 * uiScale)
                                 .height(550 * uiScale)
                                 .pad(10)
                                 .row();
 
-                            // Добавляем кнопки: Join -> true, Cancel -> false
                             dlg.button("Join", true);
                             dlg.button("Cancel", false);
                             dlg.getButtonTable().top();
                             dlg.getButtonTable().padBottom(20f);
-                            // Клавиши быстрого выбора
                             dlg.key(com.badlogic.gdx.Input.Keys.ENTER, true);
                             dlg.key(com.badlogic.gdx.Input.Keys.ESCAPE, false);
-
-                            // Показываем диалог
                             dlg.show(stage);
                             for (Actor a : dlg.getButtonTable().getChildren()) {
                                 if (a instanceof TextButton) {
@@ -223,13 +205,11 @@ public class LobbyScreen implements Screen {
                 }
             }
         });
-        // Фон
         Texture bgTexture = new Texture(Gdx.files.internal("sgx/raw/background2.jpg"));
         Image background = new Image(bgTexture);
         background.setFillParent(true);
-        stage.addActor(background); // Сначала фон
+        stage.addActor(background);
 
-        // Таблица для UI
         Table table = new Table();
         table.setFillParent(true);
         table.center();
@@ -270,7 +250,7 @@ public class LobbyScreen implements Screen {
         hostBtn.getLabel().setColor(Color.WHITE);
         joinBtn.getLabel().setColor(Color.WHITE);
 
-        stage.addActor(table); // Затем UI
+        stage.addActor(table);
     }
 
     private boolean isNickValid(String nick) {
@@ -311,7 +291,7 @@ public class LobbyScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        Gdx.gl.glClearColor(1, 1, 1, 1); // белый фон, если ничего не отрисуется
+        Gdx.gl.glClearColor(1, 1, 1, 1);
         stage.act(delta);
         stage.draw();
     }

@@ -50,12 +50,10 @@ public class BettingManager {
     private void placeBet(Player player, double amount) {
         synchronized (betLock) {
             if (player.getBalance() > amount) {
-                // Если хватает денег, списываем полную сумму
                 player.decreaseBalance(amount);
                 player.setCurrentBetFromPlayers(player.getCurrentBetFromPlayer() + amount);
                 pot += amount;
             } else {
-                // Игрок идет All-in
                 double allInAmount = player.getBalance();
                 player.decreaseBalance(allInAmount);
                 player.setAllIn();
@@ -105,7 +103,6 @@ public class BettingManager {
             int idx = (dealerIndex + i) % size;
             logicalOrder.add(activePlayers.get(idx).getName());
         }
-        // Отправить этот порядок клиентам:
         PlayerOrderPacket orderPacket = new PlayerOrderPacket(logicalOrder);
         server.sendToAllTCP(orderPacket);
 
@@ -121,7 +118,6 @@ public class BettingManager {
 
         messages.add(smallBlindPlayer.getName() + " places small blind: " + smallBlind);
         messages.add(bigBlindPlayer.getName() + " places big blind: " + bigBlind);
-        // Отправим одним пакетом
         BlindsNotification blindsNotification = new BlindsNotification(messages, dealerPlayer.getConnectionId());
         server.sendToAllTCP(blindsNotification);
 
@@ -181,21 +177,19 @@ public class BettingManager {
         List<Player> activePlayers = playerManager.getActivePlayers();
         int playersCount = activePlayers.size();
 
-        Set<Player> hasActed = new HashSet<>(); // Сохраняем кто уже действовал в этом раунде
+        Set<Player> hasActed = new HashSet<>();
 
         while (!roundEnded) {
-            activePlayers = playerManager.getActivePlayers(); // на случай фолда
+            activePlayers = playerManager.getActivePlayers();
             long nonAllIn = activePlayers.stream()
                 .filter(p -> !p.isFolded() && !p.isAllIn())
                 .count();
             if (nonAllIn==1) {
-                // Находим этого единственного не-All-in игрока
                 Player caller = activePlayers.stream()
                     .filter(p -> !p.isAllIn())
                     .findFirst()
                     .get();
                 System.out.println(caller.getCurrentBetFromPlayer()+ "");
-                // Если он уже сделал текущий колл (ставка совпала с текущим бетом) — завершаем
                 if ((caller.getCurrentBetFromPlayer() == currentBet)) {
                     roundEnded = true;
                     break;
@@ -216,7 +210,7 @@ public class BettingManager {
                 String action = actionObj.actionType.toLowerCase();
                 double raiseAmount = actionObj.amount;
 
-                hasActed.add(player); // Запоминаем, что этот игрок уже действовал
+                hasActed.add(player);
 
                 switch (action) {
                     case "fold":
@@ -262,8 +256,8 @@ public class BettingManager {
                             currentBet = allInTotal;
                             placeBet(player, allInTotal);
                             raiserIndex = currentPlayerIndex;
-                            hasActed.clear(); // Все должны заново отвечать!
-                            hasActed.add(player); // кроме текущего
+                            hasActed.clear();
+                            hasActed.add(player);
                             restartRound = true;
                             break;
                         }
@@ -283,7 +277,6 @@ public class BettingManager {
                     .filter(p -> !p.isFolded() && !p.isAllIn())
                     .count();
 
-                // Условие завершения раунда: все активные игроки поставили одинаково и все сделали хотя бы одно действие
                 boolean allMatched = activePlayers.stream()
                     .filter(p -> !p.isFolded() && !p.isAllIn())
                     .allMatch(p -> p.getCurrentBetFromPlayer() == currentBet);
@@ -334,8 +327,8 @@ public class BettingManager {
 
     private synchronized boolean checkIfRoundEnded() {
         if (playerManager.getActivePlayers().stream()
-            .filter(p -> !p.isFolded()&&!p.isAllIn()) //&& !p.isAllIn()
-            .allMatch(p -> p.getCurrentBetFromPlayer() == currentBet)) return true;//&& !p.isAllIn()
+            .filter(p -> !p.isFolded()&&!p.isAllIn())
+            .allMatch(p -> p.getCurrentBetFromPlayer() == currentBet)) return true;
         List<Player> list = new ArrayList<>();
         for (Player player : playerManager.getActivePlayers()) {
             if (!player.isAllIn()) {

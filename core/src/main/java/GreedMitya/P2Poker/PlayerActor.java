@@ -41,37 +41,31 @@ public class PlayerActor extends WidgetGroup {
         this.playerId = playerId;
         this.isLocalPlayer = isLocalPlayer;
 
-        // --- Рамка вокруг игрока ---
         frameTable = new Table(skin);
         frameTable.pad(6);
         frameTable.left().top();
         frameTable.defaults().expand(false, false);
 
-
-        // --- Аватар ---
         avatarImage = new Image(avatarTexture);
         avatarImage.setSize(avatarSize, avatarSize);
 
-        // --- Имя и баланс ---
         nameLabel = new Label(nickname, skin);
         nameLabel.setFontScale(0.9f);
-        nameLabel.setColor(Color.WHITE); // Белый цвет ника
+        nameLabel.setColor(Color.WHITE);
 
         balanceLabel = new Label((int) balance + "$", skin);
         balanceLabel.setFontScale(0.8f);
-        balanceLabel.setColor(Color.valueOf("7CFC00")); // Неоново-зелёный цвет баланса
+        balanceLabel.setColor(Color.valueOf("7CFC00"));
 
 
         Table infoTable = new Table();
         infoTable.add(nameLabel).left().row();
         infoTable.add(balanceLabel).left();
 
-        // Внутрь рамки: аватар + инфо
         frameTable.add(avatarImage).size(avatarSize).padRight(8);
         frameTable.add(infoTable).left();
         frameTable.pack();
 
-        // Добавим рамку в иерархию
         addActor(frameTable);
     }
 
@@ -80,7 +74,6 @@ public class PlayerActor extends WidgetGroup {
         super.layout();
         frameTable.setPosition(0, 0);
 
-        // 1) Центрируем карты (лицевые и рубашки) над аватаром:
         float totalWidth = backActors.isEmpty()
             ? handCardActors.size() * cardWidth + (handCardActors.size()-1)*cardSpacing
             : backActors.size()     * cardWidth + (backActors.size()-1)*cardSpacing;
@@ -90,18 +83,15 @@ public class PlayerActor extends WidgetGroup {
         float startX  = avatarX + avatarW/2f - totalWidth/2f;
         float cardY   = frameTable.getTop() + 5f;
 
-        // Своя рука
         for (int i = 0; i < handCardActors.size(); i++) {
             Actor c = handCardActors.get(i);
             c.setPosition(startX + i*(cardWidth+cardSpacing), cardY);
         }
-        // Рубашки оппонента
         for (int i = 0; i < backActors.size(); i++) {
             Actor c = backActors.get(i);
             c.setPosition(startX + i*(cardWidth+cardSpacing), cardY);
         }
 
-        // 2) Ставка слева от аватара
         if (betLabel != null) {
             float labelX = avatarX - betLabel.getWidth() - 8f;
             float labelY = avatarY + avatarH/2f - betLabel.getHeight()/2f;
@@ -148,7 +138,7 @@ public class PlayerActor extends WidgetGroup {
     public void setDealer(boolean isDealer) {
         if (isDealer) {
             if (dealerButton == null) {
-                Texture dealerTexture = new Texture("sgx/raw/DealerButton.png"); // или из скина
+                Texture dealerTexture = new Texture("sgx/raw/DealerButton.png");
                 dealerButton = new Image(dealerTexture);
                 dealerButton.setSize(44f * UIScale.ui, 36f * UIScale.ui);
                 addActor(dealerButton);
@@ -172,7 +162,7 @@ public class PlayerActor extends WidgetGroup {
             addActor(actor);
             handCardActors.add(actor);
         }
-        invalidate(); // для пересчёта layout()
+        invalidate();
     }
     public void showCardBacks() {
         if (isLocalPlayer || !handCardActors.isEmpty()) return;
@@ -264,7 +254,6 @@ public class PlayerActor extends WidgetGroup {
         flying.setFontScale(1.2f);
         flying.setColor(Color.GOLD);
 
-        // Начальная позиция — центр над аватаркой
         Vector2 from = localToStageCoordinates(new Vector2(
             getWidth() / 2f,
             getHeight() / 2f

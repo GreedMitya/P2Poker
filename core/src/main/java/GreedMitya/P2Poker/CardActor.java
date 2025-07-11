@@ -24,21 +24,20 @@ public class CardActor extends Actor {
             this.faceTexture = CardTextureManager.getTexture(card);
             setSize(faceTexture.getRegionWidth(), faceTexture.getRegionHeight());
         } else {
-            this.faceTexture = null; // Для рубашки
+            this.faceTexture = null;
             setSize(backTexture.getRegionWidth(), backTexture.getRegionHeight());
             faceDown = true;
         }
     }
     public void setDimmed(boolean dimmed) {
         if (dimmed) {
-            this.setColor(0.5f, 0.5f, 0.5f, 1f); // серый цвет
+            this.setColor(0.5f, 0.5f, 0.5f, 1f);
         } else {
-            this.setColor(1f, 1f, 1f, 1f); // нормальный цвет
+            this.setColor(1f, 1f, 1f, 1f);
         }
     }
 
 
-    // Новые методы для «переворота» карты
     public void showBack() {
         setFaceDown(true);
     }
@@ -52,7 +51,6 @@ public class CardActor extends Actor {
     }
     public void setFaceDown(boolean faceDown) {
         this.faceDown = faceDown;
-        // Увеличиваем размер карт
         setSize(UIConfig.CARD_BASE_WIDTH*UIScale.ui, UIConfig.CARD_BASE_HEIGHT*UIScale.ui); // Примерно на 1.5x больше
     }
 

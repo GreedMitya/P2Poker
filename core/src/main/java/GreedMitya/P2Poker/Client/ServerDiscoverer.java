@@ -28,7 +28,7 @@ public class ServerDiscoverer {
             );
 
             socket.send(requestPacket);
-            Logger.client("📡 Broadcast отправлен");
+            Logger.client("Broadcast отправлен");
 
             long startTime = System.currentTimeMillis();
             byte[] buffer = new byte[1500];
@@ -47,7 +47,6 @@ public class ServerDiscoverer {
                         }
                     }
                 } catch (SocketTimeoutException e) {
-                    // Таймаут — просто выходим
                     break;
                 }
             }

@@ -9,11 +9,10 @@ public class Card implements Comparable<Card>{
 
     public static final Map<Suit, String> suitSymbols = new HashMap<>();
     public static final Map<Card.Rank, String> rankSymbols = new HashMap<>();
-    private Rank rank; // Ранг карты
-    private Suit suit; // Ее Масть
+    private Rank rank;
+    private Suit suit;
 
 
-    //Делаем конструктор карты
     public Card (Rank rank, Suit suit){
         this.rank = rank;
         this.suit = suit;
@@ -33,13 +32,12 @@ public class Card implements Comparable<Card>{
     public Rank getRank() {
         return rank;
     }
-    // Делаем метод отображения карты через toString()
 
     static {
-        suitSymbols.put(Card.Suit.Hearts, "H"); //Hearts
-        suitSymbols.put(Card.Suit.Diamonds, "D"); //Diamonds
-        suitSymbols.put(Card.Suit.Clubs, "C");//Clubs
-        suitSymbols.put(Card.Suit.Spades, "S");//Spades
+        suitSymbols.put(Card.Suit.Hearts, "H");
+        suitSymbols.put(Card.Suit.Diamonds, "D");
+        suitSymbols.put(Card.Suit.Clubs, "C");
+        suitSymbols.put(Card.Suit.Spades, "S");
 
         rankSymbols.put(Card.Rank.Ace, "A");
         rankSymbols.put(Card.Rank.King, "K");
@@ -61,32 +59,32 @@ public class Card implements Comparable<Card>{
         return rankSymbols.get(rank) + suitSymbols.get(suit);
     }
 
-    public boolean equals(Object object) { // сравнение обьектов
+    public boolean equals(Object object) {
         if (this == object) return true;
         if (object == null || getClass() != object.getClass()) return false;
 
-        Card card = (Card) object; // преобразование  обьекта в карту
-        return this.rank == card.rank && this.suit == card.suit; // Сама проверка двух карт
+        Card card = (Card) object;
+        return this.rank == card.rank && this.suit == card.suit;
     }
 
     @Override
     public int compareTo(Card other) {
-        // Сначала сравниваем ранги
+
         int rankComparison = Integer.compare(this.rank.ordinal(), other.rank.ordinal());
         if (rankComparison != 0) {
-            return rankComparison; // Если ранги разные, возвращаем результат сравнения
+            return rankComparison;
         }
 
-        // Если ранги одинаковые, сравниваем масти
+
         return this.suit.ordinal() - other.suit.ordinal();
     }
 
 
 
-    public enum Suit {  // Enum простой способ хранить фиксированные данные!(Набор фиксированных констант)
+    public enum Suit {
         Hearts,Spades,Diamonds,Clubs
-    } // Надо придумать как конвертировать текст потом в удобные значки
-    public enum Rank { // У карты будет два свойства SUIT и RANK.
+    }
+    public enum Rank {
         Two,Three,Four,Five,Six,Seven,Eight,Nine,Ten,Jack,Queen,King,Ace
     }
 

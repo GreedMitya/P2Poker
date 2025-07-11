@@ -14,13 +14,11 @@ public class EndOfHandPacket {
     private List<String> combinationNames;
 
 
-    // Геттеры
     public Map<Integer, List<Card>> getHandsByPlayerId() { return handsByPlayerId; }
     public List<Integer> getWinnerIds() { return winnerIds; }
     public List<List<Card>> getWinningCards() { return winningCards; }
     public double getAmountWon() { return amountWon; }
     public List<String> getCombinationNames() { return combinationNames; }
-    // Сеттеры
     public void setHandsByPlayerId(Map<Integer, List<Card>> handsByPlayerId) {
         this.handsByPlayerId = handsByPlayerId;
     }
