@@ -7,8 +7,18 @@ No central server required.
 
 
 ## 💡 Why I built this
-This project was built as part of my learning journey in game development and network programming.  
-I wanted to create a real multiplayer system with a working UI and full poker logic from scratch.
+At sea, with no internet and only a deck of cheap physical cards, I saw my colleagues struggling to play poker during breaks.
+Meanwhile, every programming book kept telling me that practice matters more than theory — so I gave myself a challenge:
+
+Could I build a real poker game from scratch, with animations, multiplayer logic, and no central server?
+
+I had no idea if I could finish it. I didn’t know LibGDX. I didn’t even know how hard it would be.
+But I love challenges — so I started.
+
+Since then, I’ve left a job with a high salary in the maritime industry to chase a bigger goal:
+to earn the same — or more — by building things on land, with code, creativity, and persistence.
+
+This project is the first step.
 
 ---
 
