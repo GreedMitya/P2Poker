@@ -83,6 +83,13 @@ You can download the ready-to-use `.exe` file here:
 ## 🔧 Contributing
 Feel free to fork this repo and submit pull requests. All ideas are welcome.
 
+
+---
+
+
+## 🧾 License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
 ---
 
 
@@ -93,10 +100,6 @@ Email: senseimitya@gmail.com
 
 ---
 
-## 🧾 License
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
----
 
 ## 🏷️ Tags
 Java, Poker, GameDev, LibGDX, Multiplayer, Networking, Pet Project
