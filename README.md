@@ -61,6 +61,15 @@ No central server required.
 (Also includes validation for correct hand evaluation — try // testKnownHands();)
 <img width="606" height="600" alt="Probability Test" src="https://github.com/user-attachments/assets/0f124052-6064-4da1-afea-ed616504ef3c" />
 
+--- 
+## 👤 Author
+
+[GreedMitya](https://github.com/GreedMitya)  
+Email: senseimitya@gmail.com
+
+---
+
+
 
 ## P2Poker 🎲
 P2Poker — LAN покер-клиент, написанный на Java с использованием LibGDX и KryoNet.
