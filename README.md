@@ -36,14 +36,23 @@ No central server required.
 
 <img width="802" height="468" alt="{8C90E6CB-39C1-4244-900C-71BF76E00B52}" src="https://github.com/user-attachments/assets/3d1f474c-e5f2-45b2-a10a-2ef3b25b2b58" />
 
----
-## 🚀 Getting Started:
-1. Make sure you have **JDK 17+** installed  
-2. Build and run with Gradle:  
+## 🚀 Getting Started
+
+### 🧪 Option 1: Run from Source
+
+1. Make sure you have **JDK 17+** installed
+2. Build and run with Gradle:
    ```bash
    ./gradlew :lwjgl3:run
-3. Or [![Download .exe](https://img.shields.io/badge/Download%20-.exe-blue?style=for-the-badge&logo=windows)](https://github.com/GreedMitya/P2Poker/releases/latest/download/P2Poker.exe) from Releases
+   ```
 
+### 💻 Option 2: Download Executable (Windows)
+
+You can download the ready-to-use `.exe` file here:
+
+
+
+🔗 Or browse the full release page: [Releases v1.0.5](https://github.com/GreedMitya/P2Poker/releases/tag/v1.0.5)
 
 ---
 
