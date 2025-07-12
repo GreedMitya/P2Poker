@@ -1,7 +1,7 @@
 # P2Poker 🎲
 
-**P2Poker** is a LAN poker client built with Java, using LibGDX and KryoNet.  
-It enables LAN poker games over a local network — no central server required.
+**P2Poker** Peer-to-peer poker game over local network, built with LibGDX and KryoNet. 
+No central server required.
 
 ---
 
