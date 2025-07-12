@@ -14,11 +14,14 @@ No central server required.
 - Modular screen architecture: `LobbyScreen`, `GameScreen`
 
 ---
+
 ## 📈 Project Status
 
 ✅ Fully functional  
 🧪 Tested with 2–6 players  
 🚧 Currently in LAN-only mode (no internet support planned yet)
+
+
 ---
 
 ## 📸 Screenshots:
