@@ -5,6 +5,14 @@ No central server required.
 
 ---
 
+
+## 💡 Why I built this
+This project was built as part of my learning journey in game development and network programming.  
+I wanted to create a real multiplayer system with a working UI and full poker logic from scratch.
+
+---
+
+
 ## 📦 Features:
 - LAN poker for 2–6 players  
 - Client and server bundled in the same project  
@@ -20,7 +28,6 @@ No central server required.
 ✅ Fully functional  
 🧪 Tested with 2–6 players  
 🚧 Currently in LAN-only mode (no internet support planned yet)
-
 
 ---
 
@@ -51,7 +58,6 @@ No central server required.
 You can download the ready-to-use `.exe` file here:
 
 
-
 🔗 Or browse the full release page: [Releases v1.0.5](https://github.com/GreedMitya/P2Poker/releases/tag/v1.0.5)
 
 ---
@@ -73,10 +79,27 @@ You can download the ready-to-use `.exe` file here:
 <img width="606" height="600" alt="Probability Test" src="https://github.com/user-attachments/assets/0f124052-6064-4da1-afea-ed616504ef3c" />
 
 --- 
+
+## 🔧 Contributing
+Feel free to fork this repo and submit pull requests. All ideas are welcome.
+
+---
+
+
 ## 👤 Author
 
 [GreedMitya](https://github.com/GreedMitya)  
 Email: senseimitya@gmail.com
+
+---
+
+## 🧾 License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🏷️ Tags
+Java, Poker, GameDev, LibGDX, Multiplayer, Networking, Pet Project
 
 ---
 
