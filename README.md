@@ -42,7 +42,9 @@ No central server required.
 2. Build and run with Gradle:  
    ```bash
    ./gradlew :lwjgl3:run
-3. Or download the .exe from Releases
+3. Or [![Download .exe](https://img.shields.io/badge/Download%20-.exe-blue?style=for-the-badge&logo=windows)](https://github.com/GreedMitya/P2Poker/releases/latest/download/P2Poker.exe) from Releases
+
+
 ---
 
 ## 🧪 Tech Stack:
