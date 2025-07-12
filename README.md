@@ -1,24 +1,21 @@
 # P2Poker 🎲
 
-**P2Poker** — LAN покер-клиент, написанный на Java с использованием LibGDX и KryoNet.  
-Позволяет играть с другими игроками в локальной сети без централизованного сервера.
+**P2Poker** is a LAN poker client built with Java, using LibGDX and KryoNet.  
+It enables LAN poker games over a local network — no central server required.
 
-## 📦 Особенности:
-- LAN покер на 2–6 игроков
-- Клиент и сервер внутри одного проекта
-- LibGDX + Scene2D для графики и UI
-- Отображение карт, ставок, баланса и выигрыша
-- Анимации раздачи и сбора банка
-- Архитектура через экраны: LobbyScreen, GameScreen
+---
 
-## 🚀 Запуск:
-1. Убедитесь, что установлен JDK 17+
-2. Соберите через Gradle:  
-   ```bash
-   ./gradlew :lwjgl3:run
-3. Альтернатива — скачайте .exe в Releases
+## 📦 Features:
+- LAN poker for 2–6 players  
+- Client and server bundled in the same project  
+- LibGDX + Scene2D for graphics and UI  
+- Displays cards, bets, balances, and winners  
+- Deal and pot animations  
+- Modular screen architecture: `LobbyScreen`, `GameScreen`
 
-## 📸 Скриншоты:
+---
+
+## 📸 Screenshots:
 
 <img width="811" height="477" alt="{54FCD879-7969-4D63-85E0-687B5BEE7894}" src="https://github.com/user-attachments/assets/6bddc589-0763-471f-b8cb-cba48797899b" />
 
@@ -30,9 +27,59 @@
 
 <img width="802" height="468" alt="{8C90E6CB-39C1-4244-900C-71BF76E00B52}" src="https://github.com/user-attachments/assets/3d1f474c-e5f2-45b2-a10a-2ef3b25b2b58" />
 
+---
+## 🚀 Getting Started:
+1. Make sure you have **JDK 17+** installed  
+2. Build and run with Gradle:  
+   ```bash
+   ./gradlew :lwjgl3:run
+3. Or download the .exe from Releases
+---
+
+## 🧪 Tech Stack:
+- Java 17
+- LibGDX
+- KryoNet
+- Scene2D
+- Gradle
+
+---
+
+## 🎯 Fairness and Evaluation
+- Test Code: HandEvaluatorTest.java
+- Simulates 1,000,000 random hands between two players
+- Just run it and compare hand distributions to real probability
+(Also includes validation for correct hand evaluation — try // testKnownHands();)
+<img width="606" height="600" alt="Probability Test" src="https://github.com/user-attachments/assets/0f124052-6064-4da1-afea-ed616504ef3c" />
 
 
+## P2Poker 🎲
+P2Poker — LAN покер-клиент, написанный на Java с использованием LibGDX и KryoNet.
+Позволяет играть с другими игроками в локальной сети без централизованного сервера.
 
+## 📦 Особенности:
+- LAN покер на 2–6 игроков
+
+- Клиент и сервер внутри одного проекта
+
+- LibGDX + Scene2D для графики и UI
+
+- Отображение карт, ставок, баланса и выигрыша
+
+- Анимации раздачи и сбора банка
+
+- Архитектура через экраны: LobbyScreen, GameScreen
+
+## 🚀 Запуск:
+Убедитесь, что установлен JDK 17+
+
+Соберите через Gradle:
+
+bash
+Копировать
+Редактировать
+./gradlew :lwjgl3:run
+Альтернатива — скачайте .exe в Releases
 
 ## 🧪 Технологии:
 - Java 17
